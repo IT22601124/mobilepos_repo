@@ -5,6 +5,9 @@ class AppThemes {
   static const Color primaryBlue = Color(0xFF2563EB);
   static const Color primaryDarkBlue = Color(0xFF1D4ED8);
   static const Color primaryLightBlue = Color(0xFFEFF6FF);
+  static const Color inversePrimaryLigt = Colors.black;
+
+  static const Color inversePrimaryDark = Colors.white;
 
   static const Color secondaryGreen = Color(0xFF10B981);
   static const Color textDark = Color(0xFF0F172A);
@@ -17,6 +20,7 @@ class AppThemes {
     colorScheme: const ColorScheme.light(
       primary: primaryBlue,
       secondary: secondaryGreen,
+      inversePrimary:inversePrimaryLigt,
       surface: Colors.white,
       background: Color(0xFFF8FAFC),
       error: Color(0xFFEF4444),
@@ -43,6 +47,7 @@ class AppThemes {
       secondary: secondaryGreen,
       surface: Color(0xFF131A26),
       background: Color(0xFF0B0F19),
+      inversePrimary:inversePrimaryDark,
       error: Color(0xFFEF4444),
       onPrimary: Colors.white,
       onSecondary: Colors.white,

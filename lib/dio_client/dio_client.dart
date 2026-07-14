@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:mpos/resources/api_routes.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DioClient {
   static final DioClient _instance = DioClient._internal();
@@ -24,21 +25,25 @@ class DioClient {
 
     dio.interceptors.add(
       InterceptorsWrapper(
-        onRequest: (options, handler) {
-          // Add token here
-          options.headers['Authorization'] = 'Bearer YOUR_TOKEN';
-
-          print('REQUEST => ${options.method} ${options.path}');
+        onRequest: (options, handler) async {
+          final prefs = await SharedPreferences.getInstance();
+          final token = prefs.getString('access_token');
+          if (token != null && token.isNotEmpty && token != 'demo-token') {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
           handler.next(options);
         },
-        onResponse: (response, handler) {
-          print('RESPONSE => ${response.statusCode}');
-          handler.next(response);
-        },
-        onError: (error, handler) {
-          print('ERROR => ${error.message}');
-          handler.next(error);
-        },
+      ),
+    );
+
+    dio.interceptors.add(
+      LogInterceptor(
+        request: true,
+        requestBody: true,
+        requestHeader: true,
+        responseBody: true,
+        responseHeader: false,
+        error: true,
       ),
     );
   }

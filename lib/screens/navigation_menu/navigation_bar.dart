@@ -5,17 +5,20 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:circular_reveal_animation/circular_reveal_animation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:mpos/app_theme/app_theme.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mpos/provider/auth_provider/auth_provider.dart';
+import 'package:mpos/provider/theme_provider/theme_provider.dart';
+import 'package:mpos/screens/overview/dashboard_screen.dart';
+import 'package:provider/provider.dart';
+
+import '../pos_management_screen/pos_management_screen.dart';
 
 class MyHomePage extends StatefulWidget {
-  MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  final String title;
+  const MyHomePage({super.key});
 
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  State<MyHomePage> createState() => _MyHomePageState();
 }
-
 
 class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   final autoSizeGroup = AutoSizeGroup();
@@ -30,10 +33,10 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   late AnimationController _hideBottomBarAnimationController;
 
   final iconList = <IconData>[
-    Icons.brightness_5,
-    Icons.brightness_4,
-    Icons.brightness_6,
-    Icons.brightness_7,
+    Icons.dashboard,
+    Icons.production_quantity_limits_sharp,
+    Icons.settings,
+    Icons.verified_user,
   ];
 
   @override
@@ -41,40 +44,49 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
     super.initState();
 
     _fabAnimationController = AnimationController(
-      duration: Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
     _borderRadiusAnimationController = AnimationController(
-      duration: Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
     fabCurve = CurvedAnimation(
       parent: _fabAnimationController,
-      curve: Interval(0.5, 1.0, curve: Curves.fastOutSlowIn),
+      curve: const Interval(0.5, 1.0, curve: Curves.fastOutSlowIn),
     );
     borderRadiusCurve = CurvedAnimation(
       parent: _borderRadiusAnimationController,
-      curve: Interval(0.5, 1.0, curve: Curves.fastOutSlowIn),
+      curve: const Interval(0.5, 1.0, curve: Curves.fastOutSlowIn),
     );
 
     fabAnimation = Tween<double>(begin: 0, end: 1).animate(fabCurve);
-    borderRadiusAnimation = Tween<double>(begin: 0, end: 1).animate(
-      borderRadiusCurve,
-    );
+    borderRadiusAnimation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(borderRadiusCurve);
 
     _hideBottomBarAnimationController = AnimationController(
-      duration: Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 200),
       vsync: this,
     );
 
     Future.delayed(
-      Duration(seconds: 1),
-          () => _fabAnimationController.forward(),
+      const Duration(seconds: 1),
+      () => _fabAnimationController.forward(),
     );
     Future.delayed(
-      Duration(seconds: 1),
-          () => _borderRadiusAnimationController.forward(),
+      const Duration(seconds: 1),
+      () => _borderRadiusAnimationController.forward(),
     );
+  }
+
+  @override
+  void dispose() {
+    _fabAnimationController.dispose();
+    _borderRadiusAnimationController.dispose();
+    _hideBottomBarAnimationController.dispose();
+    super.dispose();
   }
 
   bool onScrollNotification(ScrollNotification notification) {
@@ -101,59 +113,49 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
       extendBody: true,
-      appBar: AppBar(
-        title: Text(
-          widget.title,
-          style: TextStyle(color: Colors.white),
-        ),
-      ),
       body: NotificationListener<ScrollNotification>(
         onNotification: onScrollNotification,
-        child: NavigationScreen(iconList[_bottomNavIndex]),
+        child: _buildBodyScreen(_bottomNavIndex),
       ),
       floatingActionButton: FloatingActionButton(
-        child: Icon(
-          Icons.brightness_3,
-          color: Colors.white
-        ),
+        backgroundColor: const Color(0xFF111184),
+        shape: const CircleBorder(),
+        child: const Icon(Icons.point_of_sale, color: Colors.white),
         onPressed: () {
-          print("FAB Clicked");
-          _fabAnimationController.reset();
-          _borderRadiusAnimationController.reset();
-          _borderRadiusAnimationController.forward();
-          _fabAnimationController.forward();
+          context.go('/pos_terminal');
         },
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: AnimatedBottomNavigationBar.builder(
+        height: 80,
         itemCount: iconList.length,
         tabBuilder: (int index, bool isActive) {
-          final color = isActive
-              ? Colors.amber
-              : Colors.blue;
+          final color = isActive ? colors.secondary : colors.onPrimary;
           return Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                iconList[index],
-                size: 24,
-                color: color,
-              ),
+              Icon(iconList[index], size: 24, color: color),
               const SizedBox(height: 4),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: AutoSizeText(
-                  "brightness $index",
+                  index == 0
+                      ? 'Dashboard'
+                      : index == 1
+                      ? 'Pos'
+                      : index == 2
+                      ? 'Settings'
+                      : 'Profile',
                   maxLines: 1,
                   style: TextStyle(color: color),
                   group: autoSizeGroup,
                 ),
-              )
+              ),
             ],
           );
         },
-        backgroundColor: colors.background,
+        backgroundColor: const Color(0xFF111184),
         activeIndex: _bottomNavIndex,
         splashColor: Colors.green,
         notchAndCornersAnimation: borderRadiusAnimation,
@@ -162,26 +164,277 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
         gapLocation: GapLocation.center,
         leftCornerRadius: 32,
         rightCornerRadius: 32,
-        onTap: (index) => setState(() => _bottomNavIndex = index),
+        onTap: (index) {
+          setState(() => _bottomNavIndex = index);
+        },
         hideAnimationController: _hideBottomBarAnimationController,
-        shadow: BoxShadow(
-          offset: Offset(0, 1),
-          blurRadius: 12,
-          spreadRadius: 0.5,
-          color: Colors.red,
+      ),
+    );
+  }
+
+  Widget _buildBodyScreen(int index) {
+    switch (index) {
+      case 0:
+        return const DashBaordScrren();
+      case 1:
+        return const PosManagementScreen();
+      case 2:
+        return const SettingsScreen();
+      case 3:
+        return const ProfileScreen();
+
+      default:
+        return NavigationScreen(iconList[index]);
+    }
+  }
+}
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final themeProvider = context.watch<ThemeProvider>();
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F8FB),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          'Settings',
+          style: TextStyle(
+            color: Color(0xFF111827),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _SettingsTile(
+              icon: Icons.dark_mode_outlined,
+              title: 'Dark mode',
+              subtitle: 'Switch app appearance',
+              trailing: Switch(
+                value: themeProvider.isDarkMode,
+                onChanged: (_) => themeProvider.toggleTheme(),
+              ),
+            ),
+            const _SettingsTile(
+              icon: Icons.receipt_long,
+              title: 'Receipt footer',
+              subtitle: 'Thank you for shopping with NOVA POS',
+              trailing: Icon(Icons.chevron_right),
+            ),
+            const _SettingsTile(
+              icon: Icons.payments_outlined,
+              title: 'Payment methods',
+              subtitle: 'Cash, card, credit and wallet enabled',
+              trailing: Icon(Icons.chevron_right),
+            ),
+            const _SettingsTile(
+              icon: Icons.security_outlined,
+              title: 'Security',
+              subtitle: 'Demo mode with local protected session',
+              trailing: Icon(Icons.chevron_right),
+            ),
+            _SettingsTile(
+              icon: Icons.storefront,
+              title: 'Store Management',
+              subtitle: 'Profile, receipt identity and logo',
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/store-management'),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final userName =
+        context.watch<AuthProvider>().currentUserName ?? 'Super Admin';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F8FB),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          'Profile',
+          style: TextStyle(
+            color: Color(0xFF111827),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: _settingsDecoration(),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: const Color(0xFF2F80ED),
+                    child: Text(
+                      userName.substring(0, 1).toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          userName,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                        const Text(
+                          'Merchant administrator',
+                          style: TextStyle(color: Color(0xFF6B7280)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _SettingsTile(
+              icon: Icons.storefront,
+              title: 'Store',
+              subtitle: 'Profile, receipt identity and logo',
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/store-management'),
+            ),
+            const _SettingsTile(
+              icon: Icons.phone_android,
+              title: 'Terminal',
+              subtitle: 'Mobile POS terminal active',
+              trailing: Icon(Icons.verified, color: Color(0xFF23C16B)),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: () async {
+                await context.read<AuthProvider>().logout();
+                if (context.mounted) context.go('/login');
+              },
+              icon: const Icon(Icons.logout),
+              label: const Text('Logout'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget trailing;
+  final VoidCallback? onTap;
+
+  const _SettingsTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: Color(0xFFE5E7EB)),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: const Color(0xFFEFF6FF),
+                  child: Icon(icon, color: const Color(0xFF2F80ED)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                trailing,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+BoxDecoration _settingsDecoration() {
+  return BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(8),
+    border: Border.all(color: const Color(0xFFE5E7EB)),
+  );
+}
+
 class NavigationScreen extends StatefulWidget {
   final IconData iconData;
 
-  NavigationScreen(this.iconData) : super();
+  const NavigationScreen(this.iconData, {super.key});
 
   @override
-  _NavigationScreenState createState() => _NavigationScreenState();
+  State<NavigationScreen> createState() => _NavigationScreenState();
 }
 
 class _NavigationScreenState extends State<NavigationScreen>
@@ -201,25 +454,19 @@ class _NavigationScreenState extends State<NavigationScreen>
   void initState() {
     _controller = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 1000),
     );
-    animation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeIn,
-    );
+    animation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
     _controller.forward();
     super.initState();
   }
 
-  _startAnimation() {
+  void _startAnimation() {
     _controller = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 1000),
     );
-    animation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeIn,
-    );
+    animation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
     _controller.forward();
   }
 
@@ -231,22 +478,17 @@ class _NavigationScreenState extends State<NavigationScreen>
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Container(
-      color: Theme.of(context).colorScheme.background,
+      color: Theme.of(context).colorScheme.surface,
       child: ListView(
         children: [
-          SizedBox(height: 64),
+          const SizedBox(height: 64),
           Center(
             child: CircularRevealAnimation(
               animation: animation,
               centerOffset: Offset(80, 80),
               maxRadius: MediaQuery.of(context).size.longestSide * 1.1,
-              child: Icon(
-                widget.iconData,
-                color: Colors.amber,
-                size: 160,
-              ),
+              child: Icon(widget.iconData, color: Colors.amber, size: 160),
             ),
           ),
         ],

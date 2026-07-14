@@ -1,7 +1,14 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mpos/app_theme/app_theme.dart';
-import 'package:mpos/resources/color_resources.dart'; // Import color resources
+import 'package:mpos/resources/color_resources.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../provider/auth_provider/auth_provider.dart';
+import '../../provider/splash_provider/splash_provider.dart'; // Import color resources
 
 class NovaSplashSelector extends StatefulWidget {
   const NovaSplashSelector({super.key});
@@ -18,12 +25,11 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
   double _loadingProgress = 0.0;
   String _statusText = 'Initializing security node...';
   Timer? _progressTimer;
+  String? errorMessage;
 
   @override
   void initState() {
     super.initState();
-
-    // 1. Logo Entry Animations (Fade & Scale)
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -43,10 +49,35 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
       ),
     );
 
-    _animationController.forward();
 
-    // 2. Linear Loading Progress Simulation
+    _loadingData();
+  }
+
+  void _loadingData()async{
+    _animationController.forward();
     _startProgressLoader();
+    final splashProvider = Provider.of<SplashProvider>(context, listen: false);
+    try{
+      Response response = await splashProvider.verifyConnection();
+      if(response.statusCode != 200){
+        throw Exception('Failed to verify connection: ${response.statusCode}');
+      }
+    }
+    catch(e){
+      print('Continuing in offline demo mode: $e');
+    }
+
+    await Future.delayed(const Duration(milliseconds: 900));
+    if (!mounted) return;
+
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    if(token != null && token.isNotEmpty){
+      await Provider.of<AuthProvider>(context, listen: false).restoreSession();
+      context.go('/mainNavigation');
+    }else {
+      _navigateToLogin();
+    }
   }
 
   void _startProgressLoader() {
@@ -72,24 +103,17 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
           _progressTimer?.cancel();
 
           // 3. Route to Login/PIN Screen
-          _navigateToLogin();
+
         }
       });
     });
   }
 
   void _navigateToLogin() {
-    Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => const AlertDialog(
-            title: Text('Routing Successful'),
-            content: Text('Auto-redirecting to PIN Login Screen...'),
-          ),
-        );
+        context.go('/login');
       }
-    });
+
   }
 
   @override
@@ -154,7 +178,7 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
                     ),
                     const SizedBox(height: 6),
                      Text(
-                      'Smart Business, Simplified Payments',
+                      errorMessage ?? 'Smart Business, Simplified Payments',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -165,7 +189,7 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
                     const SizedBox(height: 40),
 
                     // Progress Indicator Area (Custom Gradient Container)
-                    Container(
+                    errorMessage == null ? Container(
                       width: 200,
                       height: 6,
                       decoration: BoxDecoration(
@@ -193,16 +217,16 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
                           ),
                         ],
                       ),
-                    ),
+                    ):SizedBox(),
                     const SizedBox(height: 12),
-                    Text(
+                    errorMessage == null ? Text(
                       _statusText,
                       style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: ColorResources.textSecondary, // Using ColorResources
                       ),
-                    ),
+                    ): SizedBox.shrink(),
                   ],
                 ),
               ),

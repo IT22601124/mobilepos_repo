@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mpos/main_widget/main_button.dart';
-import 'package:mpos/screens/auth_screens/register_screen.dart';
+import 'package:mpos/provider/auth_provider/auth_provider.dart';
+import 'package:provider/provider.dart';
 
 class NovaLoginScreen extends StatefulWidget {
   const NovaLoginScreen({super.key});
@@ -24,11 +26,35 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() {
+  Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Logging in...')),
-      );
+      try{
+        final provider = Provider.of<AuthProvider>(context, listen: false);
+        final success = await  provider.login(
+          _phoneController.text.trim(),
+          _passwordController.text.trim(),
+        );
+        if (!success) {
+          throw Exception('Invalid credentials');
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login successful')),
+        );
+        context.go('/mainNavigation');
+        // Navigator.of(context).pushAndRemoveUntil(
+        //   MaterialPageRoute(
+        //     builder: (_) => MyHomePage(title: 'Main Navigation'),
+        //   ),
+        //   (route) => false,
+        // );
+      }
+      catch(e){
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login failed: $e')),
+        );
+      }
     }
   }
 
@@ -37,7 +63,7 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
     final color = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: color.background,
+      backgroundColor: color.surface,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -74,7 +100,19 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                       'Unlock your mobile checkout drawer',
                       style: TextStyle(
                         fontSize: 12,
-                        color: color.onSurface.withOpacity(0.6),
+                        color: color.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Text(
+                      'Demo: 0777123456 / 123456',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: color.primary,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -87,7 +125,7 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: color.onSurface.withOpacity(0.6),
+                      color: color.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
 
@@ -100,7 +138,7 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                     decoration: InputDecoration(
                       hintText: 'e.g. 0777123456',
                       hintStyle: TextStyle(
-                        color: color.onSurface.withOpacity(0.4),
+                        color: color.onSurface.withValues(alpha: 0.4),
                       ),
                       prefixIcon: Icon(
                         Icons.phone_android_outlined,
@@ -114,7 +152,7 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
-                          color: color.outline.withOpacity(0.3),
+                          color: color.outline.withValues(alpha: 0.3),
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
@@ -135,7 +173,7 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: color.onSurface.withOpacity(0.6),
+                      color: color.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
 
@@ -148,7 +186,7 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                     decoration: InputDecoration(
                       hintText: '••••••••',
                       hintStyle: TextStyle(
-                        color: color.onSurface.withOpacity(0.4),
+                        color: color.onSurface.withValues(alpha: 0.4),
                       ),
                       prefixIcon: Icon(
                         Icons.lock_outline,
@@ -209,34 +247,21 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
 
                   const SizedBox(height: 24),
 
-                  // ================= LOGIN BUTTON =================
                   MainButton(text: 'Login', onPressed: _handleLogin,),
 
                   const SizedBox(height: 20),
-
-                  // ================= SIGN UP =================
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "Don't have an account? ",
-                        style: TextStyle(color: color.onSurface.withOpacity(0.6)),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const NovaCreateAccountScreen(),
-                            ),
-                          );
-                        },
-                        child: Text(
-                          'Sign Up',
-                          style: TextStyle(
-                            color: color.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        'New merchant? ',
+                        style: TextStyle(
+                          color: color.onSurface.withValues(alpha: 0.6),
                         ),
+                      ),
+                      TextButton(
+                        onPressed: () => context.go('/register'),
+                        child: const Text('Create account'),
                       ),
                     ],
                   ),

@@ -17,23 +17,26 @@ class MainButton extends StatefulWidget {
 class _MainButtonState extends State<MainButton> {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      decoration: BoxDecoration(
-        color: widget.backgroundColor ?? Theme.of(context).colorScheme.primary,
-        borderRadius: BorderRadius.circular(12),
-      ),child: Center(
-        child: widget.isLoading == true ?  SizedBox(
-          height: 20,
-          width: 20,
-          child: LoadingAnimationWidget.hexagonDots(
-              color: widget.textColor ?? Colors.white, size: 30),
-        ) : Text(
-          widget.text,
-          style: TextStyle(
-            color: widget.textColor ?? Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+    return GestureDetector(
+      onTap:widget.onPressed,
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: widget.backgroundColor ?? Theme.of(context).colorScheme.primary,
+          borderRadius: BorderRadius.circular(12),
+        ),child: Center(
+          child: widget.isLoading == true ?  SizedBox(
+            height: 20,
+            width: 20,
+            child: LoadingAnimationWidget.hexagonDots(
+                color: widget.textColor ?? Colors.white, size: 30),
+          ) : Text(
+            widget.text,
+            style: TextStyle(
+              color: widget.textColor ?? Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),

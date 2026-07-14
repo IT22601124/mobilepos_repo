@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mpos/main_widget/main_button.dart';
+import 'package:mpos/provider/auth_provider/auth_provider.dart';
+import 'package:provider/provider.dart';
+
+import '../../model/user_model.dart';
 
 class NovaCreateAccountScreen extends StatefulWidget {
   const NovaCreateAccountScreen({super.key});
@@ -11,21 +16,17 @@ class NovaCreateAccountScreen extends StatefulWidget {
 
 class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
   final _formKey = GlobalKey<FormState>();
-
-  final TextEditingController _businessController = TextEditingController();
   final TextEditingController _ownerController = TextEditingController();
   final TextEditingController _mobileController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-  TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
-    _businessController.dispose();
     _ownerController.dispose();
     _mobileController.dispose();
     _emailController.dispose();
@@ -34,11 +35,21 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
     super.dispose();
   }
 
-  void _register() {
+  void _register() async{
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Registering store...")),
+      final user = UserModel(
+        name: _ownerController.text.trim(),
+        phone: _mobileController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
       );
+      await authProvider.createAccount(user);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Account ready. Sign in to continue.')),
+      );
+      context.go('/login');
     }
   }
 
@@ -103,25 +114,7 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text("BUSINESS NAME",
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: color.onSurface.withOpacity(0.6))),
-
-                const SizedBox(height: 8),
-
-                TextFormField(
-                  controller: _businessController,
-                  decoration:
-                  buildInput("e.g. Apex Supermarket", Icons.store),
-                  validator: (v) =>
-                  v!.isEmpty ? "Business name required" : null,
-                ),
-
-                const SizedBox(height: 18),
-
-                Text("OWNER FULL NAME",
+                Text("FULL NAME",
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -133,11 +126,16 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
                   controller: _ownerController,
                   decoration:
                   buildInput("e.g. Alex Mercer", Icons.person),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Enter full name';
+                    }
+                    return null;
+                  },
                 ),
 
                 const SizedBox(height: 18),
 
-                // ================= MOBILE =================
                 Text("MOBILE NUMBER",
                     style: TextStyle(
                         fontSize: 11,
@@ -151,6 +149,12 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
                   keyboardType: TextInputType.phone,
                   decoration:
                   buildInput("e.g. 0712345678", Icons.phone_android),
+                  validator: (value) {
+                    if (value == null || value.trim().length < 9) {
+                      return 'Enter valid mobile number';
+                    }
+                    return null;
+                  },
                 ),
 
                 const SizedBox(height: 18),
@@ -169,6 +173,12 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
                   keyboardType: TextInputType.emailAddress,
                   decoration:
                   buildInput("admin@admin.com", Icons.email_outlined),
+                  validator: (value) {
+                    if (value == null || !value.contains('@')) {
+                      return 'Enter valid email';
+                    }
+                    return null;
+                  },
                 ),
 
                 const SizedBox(height: 18),
@@ -202,6 +212,12 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
                       },
                     ),
                   ),
+                  validator: (value) {
+                    if (value == null || value.length < 6) {
+                      return 'Use at least 6 characters';
+                    }
+                    return null;
+                  },
                 ),
 
                 const SizedBox(height: 18),
@@ -236,6 +252,12 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
                       },
                     ),
                   ),
+                  validator: (value) {
+                    if (value != _passwordController.text) {
+                      return 'Passwords do not match';
+                    }
+                    return null;
+                  },
                 ),
 
                 const SizedBox(height: 28),
@@ -249,11 +271,12 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
       Column(
         mainAxisSize:MainAxisSize.min,
         children: [
-          MainButton(text: "Create Account", onPressed: _register,),
+          Consumer<AuthProvider>(
+              builder: (context,authProvider,child)=>
+              MainButton(text: "Create Account", onPressed: _register,isLoading: authProvider.isLoading)),
 
           const SizedBox(height: 20),
 
-          // ================= LOGIN LINK =================
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -264,7 +287,7 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
               ),
               GestureDetector(
                 onTap: () {
-                  Navigator.pop(context);
+                  context.go('/login');
                 },
                 child: Text(
                   "Login",
