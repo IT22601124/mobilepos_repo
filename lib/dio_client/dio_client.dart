@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:mpos/resources/api_routes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -23,15 +26,53 @@ class DioClient {
       ),
     );
 
+    // Temporary SSL bypass for development only.
+    dio.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient();
+
+        client.badCertificateCallback = (
+            X509Certificate certificate,
+            String host,
+            int port,
+            ) {
+          return host == 'mpos.studiorespectweddings.com';
+        };
+
+        return client;
+      },
+    );
+
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final prefs = await SharedPreferences.getInstance();
-          final token = prefs.getString('access_token');
-          if (token != null && token.isNotEmpty && token != 'demo-token') {
-            options.headers['Authorization'] = 'Bearer $token';
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            final token = prefs.getString('access_token');
+
+            if (token != null &&
+                token.isNotEmpty &&
+                token != 'demo-token') {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
+
+            handler.next(options);
+          } catch (error) {
+            handler.reject(
+              DioException(
+                requestOptions: options,
+                error: error,
+                message: 'Failed to read access token',
+              ),
+            );
           }
-          handler.next(options);
+        },
+        onError: (error, handler) {
+          print('Dio error type: ${error.type}');
+          print('Dio error message: ${error.message}');
+          print('Original error: ${error.error}');
+
+          handler.next(error);
         },
       ),
     );

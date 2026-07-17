@@ -1614,7 +1614,7 @@ class _ResourceActionCard extends StatelessWidget {
                   ),
                 ),
               ),
-              ?extraAction,
+              if (extraAction != null) extraAction!,
             ],
           ),
         ],

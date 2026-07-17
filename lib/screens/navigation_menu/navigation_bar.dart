@@ -228,6 +228,13 @@ class SettingsScreen extends StatelessWidget {
               subtitle: 'Thank you for shopping with NOVA POS',
               trailing: Icon(Icons.chevron_right),
             ),
+            _SettingsTile(
+              icon: Icons.print_outlined,
+              title: 'Printing options',
+              subtitle: 'Paper size, copies and automatic printing',
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/printing-options'),
+            ),
             const _SettingsTile(
               icon: Icons.payments_outlined,
               title: 'Payment methods',
