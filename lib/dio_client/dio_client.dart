@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
+import 'package:flutter/foundation.dart';
 import 'package:mpos/resources/api_routes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -21,6 +25,17 @@ class DioClient {
           'Accept': 'application/json',
         },
       ),
+    );
+
+    dio.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient();
+        client.badCertificateCallback = (certificate, host, port) {
+          if (kReleaseMode || !ApiRoutes.allowBadCertificates) return false;
+          return host == Uri.parse(ApiRoutes.serverUrl).host;
+        };
+        return client;
+      },
     );
 
     dio.interceptors.add(

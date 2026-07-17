@@ -8,6 +8,7 @@ import 'package:mpos/screens/pos_screen/widgets/category_tabs.dart';
 import 'package:mpos/screens/pos_screen/widgets/payment_panel.dart';
 import 'package:mpos/screens/pos_screen/widgets/product_card.dart';
 import 'package:mpos/screens/pos_screen/widgets/searchbox.dart';
+import 'package:mpos/utils/app_back_scope.dart';
 
 class PosTerminalScreen extends StatefulWidget {
   const PosTerminalScreen({super.key});
@@ -309,7 +310,7 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
@@ -413,124 +414,224 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FB),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              const SizedBox(height: 30),
-              SearchBox(
-                onChanged: (value) {
-                  setState(() {
-                    query = value;
-                  });
-                },
+    return AppBackScope(
+      fallbackRoute: '/mainNavigation',
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: Column(
+          children: [
+            _TerminalHeader(
+              cartCount: cart.fold<int>(
+                0,
+                (sum, item) => sum + ((item['qty'] as num?)?.toInt() ?? 0),
               ),
-              CategoryTabs(
-                categories: categories,
-                selectedCategory: selectedCategory,
-                onChanged: (value) {
-                  setState(() {
-                    selectedCategory = value;
-                  });
-                },
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(14),
-                  children: [
-                    if (error != null)
-                      _CatalogNotice(message: error!, onRetry: _loadCatalog),
-                    if (isLoading)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: showHeldOrders,
-                        icon: const Icon(Icons.pause_circle_outline),
-                        label: const Text('Held Orders'),
+              total: money(total),
+              isLoading: isLoading,
+              onRefresh: _loadCatalog,
+              onHeldOrders: showHeldOrders,
+              onHome: () => context.go('/mainNavigation'),
+            ),
+            SearchBox(
+              onChanged: (value) {
+                setState(() {
+                  query = value;
+                });
+              },
+            ),
+            CategoryTabs(
+              categories: categories,
+              selectedCategory: selectedCategory,
+              onChanged: (value) {
+                setState(() {
+                  selectedCategory = value;
+                });
+              },
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(14),
+                children: [
+                  if (error != null)
+                    _CatalogNotice(message: error!, onRetry: _loadCatalog),
+                  if (isLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  _SectionHeader(
+                    title: 'Products',
+                    subtitle: '${filteredProducts.length} available',
+                  ),
+                  const SizedBox(height: 10),
+                  ...filteredProducts.map(
+                    (product) => ProductCard(
+                      product: product,
+                      onTap: () => addToCart(product),
+                    ),
+                  ),
+                  if (filteredProducts.isEmpty) const _NoProductsFound(),
+                  const SizedBox(height: 14),
+                  _SectionHeader(
+                    title: 'Cart',
+                    subtitle: '${cart.length} selected',
+                  ),
+                  const SizedBox(height: 10),
+                  if (cart.isEmpty)
+                    const _EmptyCart()
+                  else
+                    ...cart.asMap().entries.map(
+                      (entry) => CartItem(
+                        item: entry.value,
+                        onMinus: () =>
+                            updateQty(entry.key, entry.value['qty'] - 1),
+                        onPlus: () =>
+                            updateQty(entry.key, entry.value['qty'] + 1),
+                        onRemove: () => updateQty(entry.key, 0),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Products',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    ...filteredProducts.map(
-                      (product) => ProductCard(
-                        product: product,
-                        onTap: () => addToCart(product),
-                      ),
-                    ),
-                    if (filteredProducts.isEmpty) const _NoProductsFound(),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Cart',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    if (cart.isEmpty)
-                      const _EmptyCart()
-                    else
-                      ...cart.asMap().entries.map(
-                        (entry) => CartItem(
-                          item: entry.value,
-                          onMinus: () =>
-                              updateQty(entry.key, entry.value['qty'] - 1),
-                          onPlus: () =>
-                              updateQty(entry.key, entry.value['qty'] + 1),
-                          onRemove: () => updateQty(entry.key, 0),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              PaymentPanel(
-                subtotal: subtotal,
-                discount: discount,
-                tax: tax,
-                total: total,
-                paymentMethod: paymentMethod,
-                onDiscountChanged: (value) {
-                  setState(() {
-                    discount = value.clamp(0, subtotal).toDouble();
-                  });
-                },
-                onPaymentChanged: (value) {
-                  setState(() {
-                    paymentMethod = value;
-                  });
-                },
-                onHold: holdOrder,
-                onPay: completeSale,
-              ),
-            ],
-          ),
-          Positioned(
-            right: 16,
-            bottom: 70,
-            child: SafeArea(
-              child: FloatingActionButton.small(
-                heroTag: 'pos_home_fab',
-                backgroundColor: const Color(0xFF23C16B),
-                onPressed: () => context.go('/mainNavigation'),
-                child: const Icon(Icons.home, color: Colors.white),
+                ],
               ),
             ),
-          ),
-        ],
+            PaymentPanel(
+              subtotal: subtotal,
+              discount: discount,
+              tax: tax,
+              total: total,
+              paymentMethod: paymentMethod,
+              onDiscountChanged: (value) {
+                setState(() {
+                  discount = value.clamp(0, subtotal).toDouble();
+                });
+              },
+              onPaymentChanged: (value) {
+                setState(() {
+                  paymentMethod = value;
+                });
+              },
+              onHold: holdOrder,
+              onPay: completeSale,
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _TerminalHeader extends StatelessWidget {
+  final int cartCount;
+  final String total;
+  final bool isLoading;
+  final VoidCallback onRefresh;
+  final VoidCallback onHeldOrders;
+  final VoidCallback onHome;
+
+  const _TerminalHeader({
+    required this.cartCount,
+    required this.total,
+    required this.isLoading,
+    required this.onRefresh,
+    required this.onHeldOrders,
+    required this.onHome,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          border: Border(
+            bottom: BorderSide(color: Theme.of(context).dividerColor),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              height: 44,
+              width: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.point_of_sale, color: Color(0xFF2F80ED)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'POS Terminal',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '$cartCount item${cartCount == 1 ? '' : 's'} | $total',
+                    style: const TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'Held orders',
+              onPressed: onHeldOrders,
+              icon: const Icon(Icons.pause_circle_outline),
+            ),
+            IconButton(
+              tooltip: 'Refresh catalog',
+              onPressed: isLoading ? null : onRefresh,
+              icon: isLoading
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+            ),
+            IconButton(
+              tooltip: 'Home',
+              onPressed: onHome,
+              icon: const Icon(Icons.home_outlined),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SectionHeader({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+          ),
+        ),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: Color(0xFF6B7280),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -542,7 +643,7 @@ class _EmptyCart extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(22),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: const Center(
         child: Text(
           'No items added',
@@ -560,7 +661,7 @@ class _NoProductsFound extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(22),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: const Center(
         child: Text(
           'No products found',
@@ -583,7 +684,9 @@ class _CatalogNotice extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF422006)
+            : const Color(0xFFFFFBEB),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: const Color(0xFFFDE68A)),
       ),
@@ -748,13 +851,13 @@ class _HeldOrdersSheetState extends State<_HeldOrdersSheet> {
           children: [
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Held Orders',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF111827),
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ),
@@ -814,7 +917,7 @@ class _HeldOrderCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -905,7 +1008,7 @@ class _HeldOrderNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Column(
         children: [
           const Icon(Icons.error_outline, color: Color(0xFFEF4444)),
@@ -930,7 +1033,7 @@ class _HeldOrderEmpty extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(22),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: const Center(
         child: Text(
           'No held orders found',
@@ -948,11 +1051,11 @@ double _toDoubleStatic(dynamic value) {
   return double.tryParse(value?.toString() ?? '') ?? 0;
 }
 
-BoxDecoration _cardDecoration() {
+BoxDecoration _cardDecoration(BuildContext context) {
   return BoxDecoration(
-    color: Colors.white,
+    color: Theme.of(context).cardColor,
     borderRadius: BorderRadius.circular(14),
-    border: Border.all(color: const Color(0xFFE5E7EB)),
+    border: Border.all(color: Theme.of(context).dividerColor),
     boxShadow: const [
       BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, 4)),
     ],

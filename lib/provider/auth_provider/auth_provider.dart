@@ -81,9 +81,37 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> verifyStoredToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+
+    if (token == null || token.isEmpty || token == 'demo-token') {
+      await logout();
+      return false;
+    }
+
+    try {
+      final response = await _dioClient.post(ApiRoutes.verifyToken);
+      final data = response.data;
+      final isRejected =
+          data is Map && (data['valid'] == false || data['success'] == false);
+
+      if (response.statusCode == 200 && !isRejected) {
+        await restoreSession();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Stored access token verification failed: $e');
+    }
+
+    await logout();
+    return false;
+  }
+
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('access_token');
+    await prefs.remove('current_user_name');
     _currentUserName = null;
     notifyListeners();
   }

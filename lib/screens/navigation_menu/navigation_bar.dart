@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mpos/provider/auth_provider/auth_provider.dart';
 import 'package:mpos/provider/theme_provider/theme_provider.dart';
 import 'package:mpos/screens/overview/dashboard_screen.dart';
+import 'package:mpos/utils/app_back_scope.dart';
 import 'package:provider/provider.dart';
 
 import '../pos_management_screen/pos_management_screen.dart';
@@ -111,63 +112,73 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Scaffold(
-      extendBody: true,
-      body: NotificationListener<ScrollNotification>(
-        onNotification: onScrollNotification,
-        child: _buildBodyScreen(_bottomNavIndex),
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF111184),
-        shape: const CircleBorder(),
-        child: const Icon(Icons.point_of_sale, color: Colors.white),
-        onPressed: () {
-          context.go('/pos_terminal');
-        },
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: AnimatedBottomNavigationBar.builder(
-        height: 80,
-        itemCount: iconList.length,
-        tabBuilder: (int index, bool isActive) {
-          final color = isActive ? colors.secondary : colors.onPrimary;
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(iconList[index], size: 24, color: color),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: AutoSizeText(
-                  index == 0
-                      ? 'Dashboard'
-                      : index == 1
-                      ? 'Pos'
-                      : index == 2
-                      ? 'Settings'
-                      : 'Profile',
-                  maxLines: 1,
-                  style: TextStyle(color: color),
-                  group: autoSizeGroup,
+    return AppBackScope(
+      allowSystemPop: true,
+      onBack: () {
+        if (_bottomNavIndex != 0) {
+          setState(() => _bottomNavIndex = 0);
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        extendBody: true,
+        body: NotificationListener<ScrollNotification>(
+          onNotification: onScrollNotification,
+          child: _buildBodyScreen(_bottomNavIndex),
+        ),
+        floatingActionButton: FloatingActionButton(
+          backgroundColor: const Color(0xFF111184),
+          shape: const CircleBorder(),
+          child: const Icon(Icons.point_of_sale, color: Colors.white),
+          onPressed: () {
+            context.go('/pos_terminal');
+          },
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+        bottomNavigationBar: AnimatedBottomNavigationBar.builder(
+          height: 80,
+          itemCount: iconList.length,
+          tabBuilder: (int index, bool isActive) {
+            final color = isActive ? colors.secondary : colors.onPrimary;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(iconList[index], size: 24, color: color),
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: AutoSizeText(
+                    index == 0
+                        ? 'Dashboard'
+                        : index == 1
+                            ? 'Pos'
+                            : index == 2
+                                ? 'Settings'
+                                : 'Profile',
+                    maxLines: 1,
+                    style: TextStyle(color: color),
+                    group: autoSizeGroup,
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
-        backgroundColor: const Color(0xFF111184),
-        activeIndex: _bottomNavIndex,
-        splashColor: Colors.green,
-        notchAndCornersAnimation: borderRadiusAnimation,
-        splashSpeedInMilliseconds: 300,
-        notchSmoothness: NotchSmoothness.defaultEdge,
-        gapLocation: GapLocation.center,
-        leftCornerRadius: 32,
-        rightCornerRadius: 32,
-        onTap: (index) {
-          setState(() => _bottomNavIndex = index);
-        },
-        hideAnimationController: _hideBottomBarAnimationController,
+              ],
+            );
+          },
+          backgroundColor: const Color(0xFF111184),
+          activeIndex: _bottomNavIndex,
+          splashColor: Colors.green,
+          notchAndCornersAnimation: borderRadiusAnimation,
+          splashSpeedInMilliseconds: 300,
+          notchSmoothness: NotchSmoothness.defaultEdge,
+          gapLocation: GapLocation.center,
+          leftCornerRadius: 32,
+          rightCornerRadius: 32,
+          onTap: (index) {
+            setState(() => _bottomNavIndex = index);
+          },
+          hideAnimationController: _hideBottomBarAnimationController,
+        ),
       ),
     );
   }
@@ -197,31 +208,18 @@ class SettingsScreen extends StatelessWidget {
     final themeProvider = context.watch<ThemeProvider>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
         title: const Text(
           'Settings',
-          style: TextStyle(
-            color: Color(0xFF111827),
-            fontWeight: FontWeight.w800,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _SettingsTile(
-              icon: Icons.dark_mode_outlined,
-              title: 'Dark mode',
-              subtitle: 'Switch app appearance',
-              trailing: Switch(
-                value: themeProvider.isDarkMode,
-                onChanged: (_) => themeProvider.toggleTheme(),
-              ),
-            ),
+            _AppearanceSettingsCard(themeProvider: themeProvider),
             const _SettingsTile(
               icon: Icons.receipt_long,
               title: 'Receipt footer',
@@ -263,16 +261,11 @@ class ProfileScreen extends StatelessWidget {
         context.watch<AuthProvider>().currentUserName ?? 'Super Admin';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
         title: const Text(
           'Profile',
-          style: TextStyle(
-            color: Color(0xFF111827),
-            fontWeight: FontWeight.w800,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: SafeArea(
@@ -281,7 +274,7 @@ class ProfileScreen extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(18),
-              decoration: _settingsDecoration(),
+              decoration: _settingsDecoration(context),
               child: Row(
                 children: [
                   CircleAvatar(
@@ -303,15 +296,15 @@ class ProfileScreen extends StatelessWidget {
                       children: [
                         Text(
                           userName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
-                            color: Color(0xFF111827),
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
-                        const Text(
+                        Text(
                           'Merchant administrator',
-                          style: TextStyle(color: Color(0xFF6B7280)),
+                          style: TextStyle(color: Theme.of(context).hintColor),
                         ),
                       ],
                     ),
@@ -354,6 +347,87 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
+class _AppearanceSettingsCard extends StatelessWidget {
+  final ThemeProvider themeProvider;
+
+  const _AppearanceSettingsCard({required this.themeProvider});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: _settingsDecoration(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.12),
+                child: Icon(
+                  Icons.dark_mode_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Appearance',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Use system, light, or dark mode',
+                      style: TextStyle(
+                        color: Theme.of(context).hintColor,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<ThemeMode>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(
+                  value: ThemeMode.system,
+                  icon: Icon(Icons.brightness_auto_outlined, size: 18),
+                  label: Text('System'),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.light,
+                  icon: Icon(Icons.light_mode_outlined, size: 18),
+                  label: Text('Light'),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.dark,
+                  icon: Icon(Icons.dark_mode_outlined, size: 18),
+                  label: Text('Dark'),
+                ),
+              ],
+              selected: {themeProvider.themeMode},
+              onSelectionChanged: (selection) {
+                themeProvider.setThemeMode(selection.first);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SettingsTile extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -374,10 +448,10 @@ class _SettingsTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side: const BorderSide(color: Color(0xFFE5E7EB)),
+          side: BorderSide(color: Theme.of(context).dividerColor),
         ),
         child: InkWell(
           onTap: onTap,
@@ -387,8 +461,10 @@ class _SettingsTile extends StatelessWidget {
             child: Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: const Color(0xFFEFF6FF),
-                  child: Icon(icon, color: const Color(0xFF2F80ED)),
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.12),
+                  child: Icon(icon, color: Theme.of(context).colorScheme.primary),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -402,8 +478,8 @@ class _SettingsTile extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         subtitle,
-                        style: const TextStyle(
-                          color: Color(0xFF6B7280),
+                        style: TextStyle(
+                          color: Theme.of(context).hintColor,
                           fontSize: 12,
                         ),
                       ),
@@ -420,11 +496,11 @@ class _SettingsTile extends StatelessWidget {
   }
 }
 
-BoxDecoration _settingsDecoration() {
+BoxDecoration _settingsDecoration(BuildContext context) {
   return BoxDecoration(
-    color: Colors.white,
+    color: Theme.of(context).cardColor,
     borderRadius: BorderRadius.circular(8),
-    border: Border.all(color: const Color(0xFFE5E7EB)),
+    border: Border.all(color: Theme.of(context).dividerColor),
   );
 }
 

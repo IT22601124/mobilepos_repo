@@ -15,13 +15,13 @@ class ManagementTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 56,
-      color: Colors.white,
+      height: 58,
+      color: Theme.of(context).cardColor,
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
         scrollDirection: Axis.horizontal,
         itemCount: tabs.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (_, index) {
           final tab = tabs[index];
           final active = tab == activeTab;
@@ -30,7 +30,15 @@ class ManagementTabs extends StatelessWidget {
             label: Text(tab),
             selected: active,
             selectedColor: const Color(0xFF23C16B),
-            backgroundColor: const Color(0xFFF3F4F6),
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            side: BorderSide(
+              color: active
+                  ? const Color(0xFF23C16B)
+                  : Theme.of(context).dividerColor,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             labelStyle: TextStyle(
               color: active ? Colors.white : const Color(0xFF374151),
               fontWeight: FontWeight.w800,

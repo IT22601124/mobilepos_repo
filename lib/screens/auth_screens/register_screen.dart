@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mpos/main_widget/main_button.dart';
 import 'package:mpos/provider/auth_provider/auth_provider.dart';
+import 'package:mpos/utils/app_back_scope.dart';
 import 'package:provider/provider.dart';
 
 import '../../model/user_model.dart';
@@ -82,7 +83,9 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
       );
     }
 
-    return Scaffold(
+    return AppBackScope(
+      fallbackRoute: '/login',
+      child: Scaffold(
       appBar: AppBar(
         title:  Column(
           children: [
@@ -301,7 +304,8 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
           )
         ],
       )
-      )
+      ),
+      ),
     );
   }
 }

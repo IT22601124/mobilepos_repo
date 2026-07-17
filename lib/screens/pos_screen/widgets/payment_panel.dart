@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-
 class PaymentPanel extends StatelessWidget {
   final double subtotal;
   final double discount;
@@ -13,6 +12,7 @@ class PaymentPanel extends StatelessWidget {
   final VoidCallback onPay;
 
   const PaymentPanel({
+    super.key,
     required this.subtotal,
     required this.discount,
     required this.tax,
@@ -30,9 +30,10 @@ class PaymentPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+        boxShadow: const [
           BoxShadow(
             color: Color(0x1A000000),
             blurRadius: 18,
@@ -45,8 +46,30 @@ class PaymentPanel extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _SummaryRow(label: 'Subtotal', value: money(subtotal)),
-            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              child: Column(
+                children: [
+                  _SummaryRow(label: 'Subtotal', value: money(subtotal)),
+                  const SizedBox(height: 5),
+                  _SummaryRow(label: 'Discount', value: money(discount)),
+                  const SizedBox(height: 5),
+                  _SummaryRow(label: 'Tax 8%', value: money(tax)),
+                  const Divider(height: 16),
+                  _SummaryRow(
+                    label: 'Total payable',
+                    value: money(total),
+                    strong: true,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
@@ -68,7 +91,7 @@ class PaymentPanel extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: paymentMethod,
+                    initialValue: paymentMethod,
                     decoration: InputDecoration(
                       labelText: 'Method',
                       border: OutlineInputBorder(
@@ -91,11 +114,6 @@ class PaymentPanel extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            _SummaryRow(label: 'Discount', value: money(discount)),
-            const SizedBox(height: 4),
-            _SummaryRow(label: 'Tax 8%', value: money(tax)),
-            _SummaryRow(label: 'Total', value: money(total), strong: true),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -104,6 +122,9 @@ class PaymentPanel extends StatelessWidget {
                     onPressed: onHold,
                     icon: const Icon(Icons.pause_circle_outline),
                     label: const Text('Hold'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -116,7 +137,10 @@ class PaymentPanel extends StatelessWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF23C16B),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
@@ -148,15 +172,19 @@ class _SummaryRow extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              color: const Color(0xFF6B7280),
-              fontWeight: strong ? FontWeight.w900 : FontWeight.w600,
+              color: Theme.of(context).hintColor,
+              fontSize: strong ? 15 : 13,
+              fontWeight: strong ? FontWeight.w900 : FontWeight.w700,
             ),
           ),
         ),
         Text(
           value,
           style: TextStyle(
-            color: strong ? const Color(0xFF23C16B) : const Color(0xFF111827),
+            color: strong
+                ? const Color(0xFF23C16B)
+                : Theme.of(context).colorScheme.onSurface,
+            fontSize: strong ? 18 : 13,
             fontWeight: FontWeight.w900,
           ),
         ),

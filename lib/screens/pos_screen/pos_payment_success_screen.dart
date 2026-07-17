@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mpos/utils/app_back_scope.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -139,17 +140,17 @@ class PosPaymentSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FB),
+    return AppBackScope(
+      fallbackRoute: '/pos_terminal',
+      child: Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF6F8FB),
-        elevation: 0,
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
             tooltip: 'Close',
             onPressed: () => context.go('/pos_terminal'),
-            icon: const Icon(Icons.close, color: Color(0xFF111827)),
+            icon: const Icon(Icons.close),
           ),
         ],
       ),
@@ -171,13 +172,13 @@ class PosPaymentSuccessScreen extends StatelessWidget {
 
             const SizedBox(height: 14),
 
-            const Center(
+            Center(
               child: Text(
                 'Payment Successful',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFF111827),
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
@@ -248,6 +249,7 @@ class PosPaymentSuccessScreen extends StatelessWidget {
           ],
         ),
       ),
+      ),
     );
   }
 }
@@ -293,7 +295,7 @@ class _ReceiptCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -318,9 +320,12 @@ class _ReceiptCard extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const Text(
+                Text(
                   'Sales Receipt',
-                  style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                  style: TextStyle(
+                    color: Theme.of(context).hintColor,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -357,8 +362,8 @@ class _ReceiptCard extends StatelessWidget {
             child: Text(
               receiptFooter,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF6B7280),
+              style: TextStyle(
+                color: Theme.of(context).hintColor,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -391,8 +396,8 @@ class _InfoRow extends StatelessWidget {
               label,
               style: TextStyle(
                 color: strong
-                    ? const Color(0xFF111827)
-                    : const Color(0xFF6B7280),
+                    ? Theme.of(context).colorScheme.onSurface
+                    : Theme.of(context).hintColor,
                 fontWeight: strong ? FontWeight.w900 : FontWeight.w500,
               ),
             ),
@@ -400,7 +405,9 @@ class _InfoRow extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              color: strong ? const Color(0xFF23C16B) : const Color(0xFF111827),
+              color: strong
+                  ? const Color(0xFF23C16B)
+                  : Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -410,11 +417,11 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-BoxDecoration _cardDecoration() {
+BoxDecoration _cardDecoration(BuildContext context) {
   return BoxDecoration(
-    color: Colors.white,
+    color: Theme.of(context).cardColor,
     borderRadius: BorderRadius.circular(16),
-    border: Border.all(color: const Color(0xFFE5E7EB)),
+    border: Border.all(color: Theme.of(context).dividerColor),
     boxShadow: const [
       BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, 4)),
     ],

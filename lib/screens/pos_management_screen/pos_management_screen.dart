@@ -1,11 +1,19 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:mpos/dio_client/dio_client.dart';
 import 'package:mpos/resources/api_routes.dart';
+import 'package:mpos/utils/app_back_scope.dart';
 
 import 'widgets/management_header.dart';
 import 'widgets/management_option_card.dart';
 import 'widgets/management_tabs.dart';
+
+const _statusOptions = [
+  _FieldOption('true', 'Active'),
+  _FieldOption('false', 'Inactive'),
+];
 
 class PosManagementScreen extends StatefulWidget {
   const PosManagementScreen({super.key});
@@ -22,6 +30,8 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
   String? _error;
   List<Map<String, dynamic>> _records = [];
   Map<String, dynamic>? _reportPayload;
+  Map<String, Map<String, dynamic>> _settingsPayloads = {};
+  final Map<String, List<_LookupOption>> _lookupCache = {};
 
   static const _green = Color(0xFF23C16B);
   static const _blue = Color(0xFF2F80ED);
@@ -57,18 +67,21 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           _FieldConfig('description', 'Description'),
           _FieldConfig(
             'category_id',
-            'Category ID',
+            'Category',
             keyboardType: TextInputType.number,
+            lookupEndpoint: ApiRoutes.categories,
           ),
           _FieldConfig(
             'brand_id',
-            'Brand ID',
+            'Brand',
             keyboardType: TextInputType.number,
+            lookupEndpoint: ApiRoutes.brands,
           ),
           _FieldConfig(
             'unit_id',
-            'Unit ID',
+            'Unit',
             keyboardType: TextInputType.number,
+            lookupEndpoint: ApiRoutes.units,
           ),
           _FieldConfig(
             'selling_price',
@@ -107,8 +120,12 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           ),
           _FieldConfig('image', 'Image path'),
           _FieldConfig('weight', 'Weight', keyboardType: TextInputType.number),
-          _FieldConfig('is_weighted', 'Weighted item'),
-          _FieldConfig('status', 'Status'),
+          _FieldConfig(
+            'is_weighted',
+            'Weighted item',
+            options: [_FieldOption('true', 'Yes'), _FieldOption('false', 'No')],
+          ),
+          _FieldConfig('status', 'Status', options: _statusOptions),
         ],
         sample: [
           {
@@ -155,7 +172,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         fields: const [
           _FieldConfig('name', 'Unit name', required: true),
           _FieldConfig('short_name', 'Short name', required: true),
-          _FieldConfig('status', 'Status'),
+          _FieldConfig('status', 'Status', options: _statusOptions),
         ],
         sample: [
           {'id': 1, 'name': 'Pieces', 'short_name': 'pcs', 'status': true},
@@ -178,7 +195,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
             keyboardType: TextInputType.emailAddress,
           ),
           _FieldConfig('address', 'Address'),
-          _FieldConfig('status', 'Status'),
+          _FieldConfig('status', 'Status', options: _statusOptions),
         ],
         sample: [
           {
@@ -199,15 +216,17 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         fields: const [
           _FieldConfig(
             'product_id',
-            'Product ID',
+            'Product',
             keyboardType: TextInputType.number,
             required: true,
+            lookupEndpoint: ApiRoutes.products,
           ),
           _FieldConfig(
             'supplier_id',
-            'Supplier ID',
+            'Supplier',
             keyboardType: TextInputType.number,
             required: true,
+            lookupEndpoint: ApiRoutes.suppliers,
           ),
           _FieldConfig(
             'supplier_price',
@@ -229,11 +248,21 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         fields: const [
           _FieldConfig(
             'product_id',
-            'Product ID',
+            'Product',
             keyboardType: TextInputType.number,
             required: true,
+            lookupEndpoint: ApiRoutes.products,
           ),
-          _FieldConfig('type', 'Type'),
+          _FieldConfig(
+            'type',
+            'Movement type',
+            options: [
+              _FieldOption('purchase', 'Purchase'),
+              _FieldOption('sale', 'Sale'),
+              _FieldOption('adjustment', 'Adjustment'),
+              _FieldOption('return', 'Return'),
+            ],
+          ),
           _FieldConfig(
             'quantity',
             'Quantity',
@@ -242,7 +271,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           ),
           _FieldConfig(
             'reference_id',
-            'Reference ID',
+            'Reference',
             keyboardType: TextInputType.number,
           ),
           _FieldConfig('remarks', 'Remarks'),
@@ -274,9 +303,10 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         fields: const [
           _FieldConfig(
             'product_id',
-            'Product ID',
+            'Product',
             keyboardType: TextInputType.number,
             required: true,
+            lookupEndpoint: ApiRoutes.products,
           ),
           _FieldConfig('batch_no', 'Batch number', required: true),
           _FieldConfig(
@@ -317,9 +347,10 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         fields: const [
           _FieldConfig(
             'product_id',
-            'Product ID',
+            'Product',
             keyboardType: TextInputType.number,
             required: true,
+            lookupEndpoint: ApiRoutes.products,
           ),
           _FieldConfig('image_path', 'Image path', required: true),
         ],
@@ -341,7 +372,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
             'Percentage',
             keyboardType: TextInputType.number,
           ),
-          _FieldConfig('status', 'Status'),
+          _FieldConfig('status', 'Status', options: _statusOptions),
         ],
         sample: [
           {'id': 1, 'name': 'VAT', 'percentage': 8, 'status': true},
@@ -356,11 +387,19 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         color: _pink,
         fields: const [
           _FieldConfig('name', 'Discount name', required: true),
-          _FieldConfig('discount_type', 'Discount type', required: true),
+          _FieldConfig(
+            'discount_type',
+            'Discount type',
+            required: true,
+            options: [
+              _FieldOption('fixed', 'Fixed amount'),
+              _FieldOption('percentage', 'Percentage'),
+            ],
+          ),
           _FieldConfig('value', 'Value', keyboardType: TextInputType.number),
           _FieldConfig('start_date', 'Start date'),
           _FieldConfig('end_date', 'End date'),
-          _FieldConfig('status', 'Status'),
+          _FieldConfig('status', 'Status', options: _statusOptions),
         ],
         sample: [
           {
@@ -382,9 +421,10 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         fields: const [
           _FieldConfig(
             'product_id',
-            'Product ID',
+            'Product',
             keyboardType: TextInputType.number,
             required: true,
+            lookupEndpoint: ApiRoutes.products,
           ),
           _FieldConfig('name', 'Variant name', required: true),
           _FieldConfig('barcode', 'Barcode'),
@@ -440,7 +480,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
             'Current balance',
             keyboardType: TextInputType.number,
           ),
-          _FieldConfig('status', 'Status'),
+          _FieldConfig('status', 'Status', options: _statusOptions),
         ],
         sample: [
           {
@@ -469,11 +509,20 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         fields: const [
           _FieldConfig(
             'customer_id',
-            'Customer ID',
+            'Customer',
             keyboardType: TextInputType.number,
             required: true,
+            lookupEndpoint: ApiRoutes.customers,
           ),
-          _FieldConfig('type', 'Type'),
+          _FieldConfig(
+            'type',
+            'Transaction type',
+            options: [
+              _FieldOption('credit_sale', 'Credit sale'),
+              _FieldOption('payment', 'Payment'),
+              _FieldOption('adjustment', 'Adjustment'),
+            ],
+          ),
           _FieldConfig(
             'amount',
             'Amount',
@@ -482,7 +531,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           ),
           _FieldConfig(
             'reference_id',
-            'Reference ID',
+            'Reference',
             keyboardType: TextInputType.number,
           ),
           _FieldConfig('remarks', 'Remarks'),
@@ -498,6 +547,73 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         ],
       ),
       _ResourceConfig(
+        tab: 'Branches',
+        title: 'Branches',
+        subtitle: 'Branch name, code, contact details and status.',
+        endpoint: ApiRoutes.branches,
+        icon: Icons.store_mall_directory_outlined,
+        color: _green,
+        fields: const [
+          _FieldConfig('name', 'Branch name', required: true),
+          _FieldConfig('code', 'Branch code'),
+          _FieldConfig('phone', 'Phone', keyboardType: TextInputType.phone),
+          _FieldConfig(
+            'email',
+            'Email',
+            keyboardType: TextInputType.emailAddress,
+          ),
+          _FieldConfig('address', 'Address'),
+          _FieldConfig('status', 'Status', options: _statusOptions),
+        ],
+        sample: [
+          {
+            'id': 1,
+            'name': 'Main Branch',
+            'code': 'MAIN',
+            'phone': '0777123456',
+            'status': true,
+          },
+        ],
+      ),
+      _ResourceConfig(
+        tab: 'Roles',
+        title: 'Roles',
+        subtitle: 'Backend roles used by cashiers, admins and managers.',
+        endpoint: ApiRoutes.roles,
+        icon: Icons.admin_panel_settings_outlined,
+        color: _pink,
+        fields: const [
+          _FieldConfig('name', 'Role name', required: true),
+          _FieldConfig('role_name', 'Role display name'),
+          _FieldConfig('description', 'Description'),
+          _FieldConfig('status', 'Status', options: _statusOptions),
+        ],
+        sample: [
+          {'id': 1, 'name': 'Cashier', 'role_name': 'Cashier', 'status': true},
+        ],
+      ),
+      _ResourceConfig(
+        tab: 'Users',
+        title: 'Backend users',
+        subtitle: 'View authenticated backend users and cashier accounts.',
+        endpoint: ApiRoutes.authUsers,
+        icon: Icons.verified_user_outlined,
+        color: _blue,
+        fields: const [],
+        canCreate: false,
+        canEdit: false,
+        canDelete: false,
+        sample: [
+          {
+            'id': 1,
+            'name': 'Super Admin',
+            'phone': '0777123456',
+            'role_name': 'Super Admin',
+            'status': true,
+          },
+        ],
+      ),
+      _ResourceConfig(
         tab: 'POS sales',
         title: 'POS sales',
         subtitle: 'Create sales and update order/payment status.',
@@ -508,13 +624,15 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           _FieldConfig('sale_no', 'Sale number'),
           _FieldConfig(
             'customer_id',
-            'Customer ID',
+            'Customer',
             keyboardType: TextInputType.number,
+            lookupEndpoint: ApiRoutes.customers,
           ),
           _FieldConfig(
             'cashier_id',
-            'Cashier ID',
+            'Cashier',
             keyboardType: TextInputType.number,
+            lookupEndpoint: ApiRoutes.authUsers,
           ),
           _FieldConfig('register_no', 'Register number'),
           _FieldConfig('shift_no', 'Shift number'),
@@ -548,7 +666,16 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
             'Balance amount',
             keyboardType: TextInputType.number,
           ),
-          _FieldConfig('status', 'Status'),
+          _FieldConfig(
+            'status',
+            'Status',
+            options: [
+              _FieldOption('held', 'Held'),
+              _FieldOption('completed', 'Completed'),
+              _FieldOption('cancelled', 'Cancelled'),
+              _FieldOption('refunded', 'Refunded'),
+            ],
+          ),
           _FieldConfig('notes', 'Notes'),
         ],
         canCreate: false,
@@ -588,7 +715,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
       fields: const [
         _FieldConfig('name', 'Name', required: true),
         _FieldConfig('description', 'Description'),
-        _FieldConfig('status', 'Status'),
+        _FieldConfig('status', 'Status', options: _statusOptions),
       ],
       sample: [
         {
@@ -608,10 +735,11 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
       _error = null;
       _records = [];
       _reportPayload = null;
+      _settingsPayloads = {};
     });
 
     if (resource.kind == _ResourceKind.settings) {
-      setState(() => _isLoading = false);
+      await _loadSettings();
       return;
     }
 
@@ -627,6 +755,49 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
       setState(() {
         _error = _messageFor(error);
         _records = resource.sample;
+      });
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final responses = await Future.wait([
+        _dio.get(ApiRoutes.posSettings),
+        _dio.get(ApiRoutes.posSettingsPaymentMethods),
+        _dio.get(ApiRoutes.posSettingsReceipt),
+        _dio.get(ApiRoutes.posSettingsDiscountRules),
+      ]);
+      setState(() {
+        _settingsPayloads = {
+          'General': _asMap(responses[0].data),
+          'Payment methods': _asMap(responses[1].data),
+          'Receipt': _asMap(responses[2].data),
+          'Discount rules': _asMap(responses[3].data),
+        };
+      });
+    } catch (error) {
+      setState(() {
+        _error = _messageFor(error);
+        _settingsPayloads = {
+          'General': {
+            'endpoint': ApiRoutes.posSettings,
+            'status': 'unavailable',
+          },
+          'Payment methods': {
+            'endpoint': ApiRoutes.posSettingsPaymentMethods,
+            'enabled': ['Cash', 'Card', 'Credit'],
+          },
+          'Receipt': {
+            'endpoint': ApiRoutes.posSettingsReceipt,
+            'footer': 'Thank you for shopping with NOVA POS',
+          },
+          'Discount rules': {
+            'endpoint': ApiRoutes.posSettingsDiscountRules,
+            'rules': [],
+          },
+        };
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -699,6 +870,11 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
       'customers',
       'customer_credit_transactions',
       'customerCreditTransactions',
+      'branches',
+      'roles',
+      'users',
+      'backend_users',
+      'backendUsers',
       'records',
     ];
 
@@ -761,6 +937,10 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
       'unit_id',
       'supplier_id',
       'customer_id',
+      'branch_id',
+      'role_id',
+      'user_id',
+      'backend_user_id',
       'sale_id',
     ]) {
       final value = record[key];
@@ -901,11 +1081,112 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     );
   }
 
+  Future<void> _editSettingsEndpoint(
+    String title,
+    String endpoint,
+    Map<String, dynamic> payload,
+  ) async {
+    final controller = TextEditingController(
+      text: const JsonEncoder.withIndent('  ').convert(payload),
+    );
+    final edited = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.72,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Edit $title',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    expands: true,
+                    minLines: null,
+                    maxLines: null,
+                    textAlignVertical: TextAlignVertical.top,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      alignLabelWithHint: true,
+                      labelText: 'JSON payload',
+                    ),
+                    style: const TextStyle(fontFamily: 'monospace'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      try {
+                        final decoded = jsonDecode(controller.text);
+                        if (decoded is! Map) {
+                          throw const FormatException(
+                            'Root must be an object.',
+                          );
+                        }
+                        Navigator.pop(
+                          context,
+                          Map<String, dynamic>.from(decoded),
+                        );
+                      } catch (error) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Invalid JSON: $error'),
+                            backgroundColor: const Color(0xFFEF4444),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('Save settings'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    controller.dispose();
+    if (edited == null) return;
+
+    try {
+      setState(() => _isLoading = true);
+      await _dio.put(endpoint, data: edited);
+      _showSnack('$title updated');
+      await _loadSettings();
+    } catch (error) {
+      _showSnack(_messageFor(error), isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   void _showDetails(_ResourceConfig resource, Map<String, dynamic> record) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
@@ -942,91 +1223,225 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     );
   }
 
-  void _showForm(_ResourceConfig resource, {Map<String, dynamic>? record}) {
+  Future<void> _showForm(
+    _ResourceConfig resource, {
+    Map<String, dynamic>? record,
+  }) async {
+    final lookupOptions = <String, List<_LookupOption>>{};
+    for (final field in resource.fields) {
+      final endpoint = field.lookupEndpoint;
+      if (endpoint != null) {
+        lookupOptions[field.key] = await _lookupOptions(endpoint);
+      }
+    }
+    if (!mounted) return;
+
     final controllers = {
       for (final field in resource.fields)
         field.key: TextEditingController(
-          text: record?[field.key]?.toString() ?? '',
+          text: _initialFieldText(field, record),
         ),
     };
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (_) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 18,
-            right: 18,
-            top: 18,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 18,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  record == null
-                      ? 'Add ${resource.tab}'
-                      : 'Update ${resource.tab}',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                ...resource.fields.map(
-                  (field) => _FormInput(
-                    label: field.label,
-                    controller: controllers[field.key]!,
-                    keyboardType: field.keyboardType,
-                    required: field.required,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      final data = <String, dynamic>{};
-                      for (final field in resource.fields) {
-                        final value = controllers[field.key]!.text.trim();
-                        if (field.required && value.isEmpty) {
-                          _showSnack(
-                            '${field.label} is required',
-                            isError: true,
-                          );
-                          return;
-                        }
-                        if (value.isNotEmpty) {
-                          data[field.key] = _fieldValue(field, value);
-                        }
-                      }
-                      _saveRecord(resource, record, data);
-                    },
-                    icon: const Icon(Icons.save_outlined),
-                    label: Text(record == null ? 'Save' : 'Update'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: resource.color,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: SizedBox(
+              height: MediaQuery.of(context).size.height * 0.92,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 14, 8, 10),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: resource.color.withValues(
+                            alpha: 0.12,
+                          ),
+                          child: Icon(resource.icon, color: resource.color),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                record == null
+                                    ? 'Add ${resource.tab}'
+                                    : 'Update ${resource.tab}',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              Text(
+                                resource.subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF6B7280),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Close',
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                      children: [
+                        if (resource.tab == 'Products')
+                          const _FormHintCard(
+                            message:
+                                'Choose category, brand and unit by name. The app will send the correct IDs to the backend.',
+                          ),
+                        ...resource.fields.map((field) {
+                          final fieldOptions = field.options
+                              .map(
+                                (option) => _LookupOption(
+                                  value: option.value,
+                                  label: option.label,
+                                ),
+                              )
+                              .toList();
+                          return _FormInput(
+                            label: field.label,
+                            controller: controllers[field.key]!,
+                            keyboardType: field.keyboardType,
+                            required: field.required,
+                            options: lookupOptions[field.key] ?? fieldOptions,
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      border: Border(
+                        top: BorderSide(color: Theme.of(context).dividerColor),
+                      ),
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          final data = <String, dynamic>{};
+                          for (final field in resource.fields) {
+                            final value = controllers[field.key]!.text.trim();
+                            if (field.required && value.isEmpty) {
+                              _showSnack(
+                                '${field.label} is required',
+                                isError: true,
+                              );
+                              return;
+                            }
+                            if (value.isNotEmpty) {
+                              data[field.key] = _fieldValue(field, value);
+                            }
+                          }
+                          _saveRecord(resource, record, data);
+                        },
+                        icon: const Icon(Icons.save_outlined),
+                        label: Text(record == null ? 'Save' : 'Update'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: resource.color,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
       },
     ).whenComplete(() {
-      for (final controller in controllers.values) {
-        controller.dispose();
-      }
+      Future<void>.delayed(const Duration(seconds: 1), () {
+        for (final controller in controllers.values) {
+          controller.dispose();
+        }
+      });
     });
+  }
+
+  String _initialFieldText(_FieldConfig field, Map<String, dynamic>? record) {
+    if (record == null) return '';
+
+    final directValue = record[field.key];
+    if (directValue != null && directValue.toString().isNotEmpty) {
+      return directValue.toString();
+    }
+
+    if (field.key.endsWith('_id')) {
+      final relationKey = field.key.substring(0, field.key.length - 3);
+      final relation = record[relationKey];
+      if (relation is Map) {
+        final id = _recordId(Map<String, dynamic>.from(relation));
+        if (id != null) return id;
+      }
+    }
+
+    return '';
+  }
+
+  Future<List<_LookupOption>> _lookupOptions(String endpoint) async {
+    final cached = _lookupCache[endpoint];
+    if (cached != null) return cached;
+
+    try {
+      final response = await _dio.get(endpoint);
+      final options = _extractRows(response.data)
+          .map((record) {
+            final id = _recordId(record);
+            if (id == null) return null;
+            return _LookupOption(value: id, label: _lookupLabel(record));
+          })
+          .nonNulls
+          .toList();
+      _lookupCache[endpoint] = options;
+      return options;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  String _lookupLabel(Map<String, dynamic> record) {
+    final value = _firstValue(record, [
+      'name',
+      'title',
+      'short_name',
+      'code',
+      'product_code',
+      'sku',
+      'phone',
+      'id',
+    ]);
+    return _display(value);
   }
 
   dynamic _typedValue(String value, TextInputType keyboardType) {
@@ -1120,6 +1535,10 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     final preferred = [
       'product_code',
       'sku',
+      'code',
+      'role_name',
+      'username',
+      'email',
       'phone',
       'description',
       'status',
@@ -1155,6 +1574,8 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
       'percentage',
       'value',
       'status',
+      'code',
+      'role_name',
     ]) {
       final value = record[key];
       if (value != null && value.toString().isNotEmpty) return _display(value);
@@ -1166,47 +1587,50 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
   Widget build(BuildContext context) {
     final resource = _activeResource;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FB),
-      body: SafeArea(
-        child: Column(
-          children: [
-            const ManagementHeader(),
-            ManagementTabs(
-              tabs: _tabs,
-              activeTab: _activeTab,
-              onChanged: (value) {
-                setState(() => _activeTab = value);
-                _loadActiveTab();
-              },
-            ),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _loadActiveTab,
-                child: ListView(
-                  padding: const EdgeInsets.all(14),
-                  children: [
-                    _SectionTitle(title: resource.tab),
-                    const SizedBox(height: 12),
-                    ManagementOptionCard(
-                      icon: resource.icon,
-                      title: resource.title,
-                      subtitle: resource.subtitle,
-                      value: resource.kind == _ResourceKind.report
-                          ? '9 reports'
-                          : resource.kind == _ResourceKind.settings
-                          ? 'Configure'
-                          : '${_records.length} rows',
-                      color: resource.color,
-                    ),
-                    if (_error != null) _ApiNotice(message: _error!),
-                    if (_isLoading) const _LoadingCard(),
-                    ..._buildSection(resource),
-                  ],
+    return AppBackScope(
+      fallbackRoute: '/mainNavigation',
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: SafeArea(
+          child: Column(
+            children: [
+              const ManagementHeader(),
+              ManagementTabs(
+                tabs: _tabs,
+                activeTab: _activeTab,
+                onChanged: (value) {
+                  setState(() => _activeTab = value);
+                  _loadActiveTab();
+                },
+              ),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _loadActiveTab,
+                  child: ListView(
+                    padding: const EdgeInsets.all(14),
+                    children: [
+                      _SectionTitle(title: resource.tab),
+                      const SizedBox(height: 12),
+                      ManagementOptionCard(
+                        icon: resource.icon,
+                        title: resource.title,
+                        subtitle: resource.subtitle,
+                        value: resource.kind == _ResourceKind.report
+                            ? '9 reports'
+                            : resource.kind == _ResourceKind.settings
+                            ? 'Configure'
+                            : '${_records.length} rows',
+                        color: resource.color,
+                      ),
+                      if (_error != null) _ApiNotice(message: _error!),
+                      if (_isLoading) const _LoadingCard(),
+                      ..._buildSection(resource),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1323,24 +1747,46 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
   }
 
   List<Widget> _settingsCards() {
-    return const [
-      _SettingsTile(
-        icon: Icons.payments_outlined,
-        title: 'Payment methods',
-        subtitle: 'Cash, card, credit and wallet enabled',
-        trailing: Icon(Icons.chevron_right),
+    final cards = [
+      _SettingsEndpointConfig(
+        'General',
+        ApiRoutes.posSettings,
+        Icons.settings_outlined,
       ),
-      _SettingsTile(
-        icon: Icons.receipt_long,
-        title: 'Receipt settings',
-        subtitle: 'Invoice footer and print options',
-        trailing: Icon(Icons.chevron_right),
+      _SettingsEndpointConfig(
+        'Payment methods',
+        ApiRoutes.posSettingsPaymentMethods,
+        Icons.payments_outlined,
       ),
+      _SettingsEndpointConfig(
+        'Receipt',
+        ApiRoutes.posSettingsReceipt,
+        Icons.receipt_long,
+      ),
+      _SettingsEndpointConfig(
+        'Discount rules',
+        ApiRoutes.posSettingsDiscountRules,
+        Icons.discount_outlined,
+      ),
+    ];
+
+    return [
+      ...cards.map((config) {
+        final payload = _settingsPayloads[config.title] ?? const {};
+        return _SettingsApiCard(
+          icon: config.icon,
+          title: config.title,
+          endpoint: config.endpoint,
+          payload: payload,
+          onEdit: () =>
+              _editSettingsEndpoint(config.title, config.endpoint, payload),
+        );
+      }),
       _SettingsTile(
         icon: Icons.sync,
         title: 'API sync',
-        subtitle: 'Uses /api catalog, stock, sales and report endpoints',
-        trailing: Icon(Icons.verified, color: _green),
+        subtitle: 'Uses /api catalog, stock, sales, settings and report APIs',
+        trailing: const Icon(Icons.verified, color: _green),
       ),
     ];
   }
@@ -1415,13 +1861,31 @@ class _FieldConfig {
   final String label;
   final TextInputType keyboardType;
   final bool required;
+  final String? lookupEndpoint;
+  final List<_FieldOption> options;
 
   const _FieldConfig(
     this.key,
     this.label, {
     this.keyboardType = TextInputType.text,
     this.required = false,
+    this.lookupEndpoint,
+    this.options = const [],
   });
+}
+
+class _FieldOption {
+  final String value;
+  final String label;
+
+  const _FieldOption(this.value, this.label);
+}
+
+class _LookupOption {
+  final String value;
+  final String label;
+
+  const _LookupOption({required this.value, required this.label});
 }
 
 class _ReportConfig {
@@ -1430,6 +1894,14 @@ class _ReportConfig {
   final IconData icon;
 
   const _ReportConfig(this.label, this.endpoint, this.icon);
+}
+
+class _SettingsEndpointConfig {
+  final String title;
+  final String endpoint;
+  final IconData icon;
+
+  const _SettingsEndpointConfig(this.title, this.endpoint, this.icon);
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -1508,7 +1980,7 @@ class _EmptyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1550,7 +2022,7 @@ class _ResourceActionCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Column(
         children: [
           Row(
@@ -1628,7 +2100,7 @@ class _QueryHintCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: const Text(
         'Common report filters: start_date, end_date, branch_id, cashier_id, customer_id, product_id, category_id, payment_method, status.',
         style: TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w700),
@@ -1647,7 +2119,7 @@ class _ReportPayloadCard extends StatelessWidget {
     final entries = payload.entries.take(24).toList();
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1804,6 +2276,93 @@ class _SmallReportTile extends StatelessWidget {
   }
 }
 
+class _SettingsApiCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String endpoint;
+  final Map<String, dynamic> payload;
+  final VoidCallback onEdit;
+
+  const _SettingsApiCard({
+    required this.icon,
+    required this.title,
+    required this.endpoint,
+    required this.payload,
+    required this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = payload.isEmpty
+        ? 'No settings loaded yet'
+        : const JsonEncoder.withIndent('  ').convert(payload);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: _cardDecoration(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: const Color(0xFFEFF6FF),
+                child: Icon(icon, color: const Color(0xFF2F80ED)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      endpoint,
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Edit settings',
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: Text(
+              preview,
+              maxLines: 6,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF374151),
+                fontSize: 12,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SettingsTile extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -1822,7 +2381,7 @@ class _SettingsTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Row(
         children: [
           CircleAvatar(
@@ -1894,16 +2453,50 @@ class _FormInput extends StatelessWidget {
   final TextEditingController controller;
   final TextInputType keyboardType;
   final bool required;
+  final List<_LookupOption> options;
 
   const _FormInput({
     required this.label,
     required this.controller,
     required this.keyboardType,
     required this.required,
+    required this.options,
   });
 
   @override
   Widget build(BuildContext context) {
+    final menuOptions = options.isNotEmpty ? options : const <_LookupOption>[];
+
+    if (menuOptions.isNotEmpty) {
+      final selected =
+          menuOptions.any((option) => option.value == controller.text)
+          ? controller.text
+          : null;
+
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: DropdownButtonFormField<String>(
+          initialValue: selected,
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: required ? '$label *' : label,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          items: menuOptions
+              .map(
+                (option) => DropdownMenuItem<String>(
+                  value: option.value,
+                  child: Text(option.label, overflow: TextOverflow.ellipsis),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            controller.text = value ?? '';
+          },
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: TextField(
@@ -1918,11 +2511,47 @@ class _FormInput extends StatelessWidget {
   }
 }
 
-BoxDecoration _cardDecoration() {
+class _FormHintCard extends StatelessWidget {
+  final String message;
+
+  const _FormHintCard({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, color: Color(0xFF2F80ED), size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Color(0xFF1E3A8A),
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+BoxDecoration _cardDecoration(BuildContext context) {
   return BoxDecoration(
-    color: Colors.white,
+    color: Theme.of(context).cardColor,
     borderRadius: BorderRadius.circular(8),
-    border: Border.all(color: const Color(0xFFE5E7EB)),
+    border: Border.all(color: Theme.of(context).dividerColor),
   );
 }
 
