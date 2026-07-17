@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mpos/main_widget/main_button.dart';
 import 'package:mpos/provider/auth_provider/auth_provider.dart';
+import 'package:mpos/utils/app_back_scope.dart';
 import 'package:provider/provider.dart';
 
 class NovaLoginScreen extends StatefulWidget {
@@ -62,7 +63,9 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
 
-    return Scaffold(
+    return AppBackScope(
+      allowSystemPop: true,
+      child: Scaffold(
       backgroundColor: color.surface,
       body: SafeArea(
         child: Center(
@@ -270,6 +273,7 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

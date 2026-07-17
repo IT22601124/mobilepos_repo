@@ -36,13 +36,14 @@ Future<void> main() async{
   await NotificationService.initialize();
 
   runApp(
-    MultiProvider(providers: [
-      ChangeNotifierProvider(create: (_) => ThemeProvider()),
-      ChangeNotifierProvider(create: (_) => SplashProvider()),
-      ChangeNotifierProvider(create: (_) => AuthProvider()),
-    ],
-    child: NovaPOSApp(),
-    )
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => SplashProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+      ],
+      child: const NovaPOSApp(),
+    ),
   );
 }
 
@@ -54,17 +55,15 @@ class NovaPOSApp extends StatefulWidget {
 }
 
 class _NovaPOSAppState extends State<NovaPOSApp> {
-
   @override
   Widget build(BuildContext context) {
-    return  Consumer<ThemeProvider>(
-      builder:(context,_themeProvider,child)=>
-      MaterialApp.router(
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) => MaterialApp.router(
         debugShowCheckedModeBanner:false,
         title: 'NovaPOS',
         theme: AppThemes.lightTheme,
         darkTheme: AppThemes.darkTheme,
-        themeMode: _themeProvider.isDarkMode == false  ? ThemeMode.light : ThemeMode.dark, // Controlled by state
+        themeMode: themeProvider.themeMode,
         routerConfig: router,
       ),
     );

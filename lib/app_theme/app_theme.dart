@@ -5,7 +5,7 @@ class AppThemes {
   static const Color primaryBlue = Color(0xFF2563EB);
   static const Color primaryDarkBlue = Color(0xFF1D4ED8);
   static const Color primaryLightBlue = Color(0xFFEFF6FF);
-  static const Color inversePrimaryLigt = Colors.black;
+  static const Color inversePrimaryLight = Colors.black;
 
   static const Color inversePrimaryDark = Colors.white;
 
@@ -20,14 +20,24 @@ class AppThemes {
     colorScheme: const ColorScheme.light(
       primary: primaryBlue,
       secondary: secondaryGreen,
-      inversePrimary:inversePrimaryLigt,
+      inversePrimary: inversePrimaryLight,
       surface: Colors.white,
-      background: Color(0xFFF8FAFC),
       error: Color(0xFFEF4444),
       onPrimary: Colors.white,
       onSecondary: Colors.white,
       onSurface: textDark,
-      onBackground: textDark,
+    ),
+    scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.white,
+      foregroundColor: textDark,
+      elevation: 0,
+      centerTitle: false,
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
     ),
     cardTheme: CardThemeData(
       color: Colors.white,
@@ -46,16 +56,26 @@ class AppThemes {
       primary: Color(0xFF3B82F6), // Slightly lighter blue for dark contrast
       secondary: secondaryGreen,
       surface: Color(0xFF131A26),
-      background: Color(0xFF0B0F19),
-      inversePrimary:inversePrimaryDark,
+      inversePrimary: inversePrimaryDark,
       error: Color(0xFFEF4444),
       onPrimary: Colors.white,
       onSecondary: Colors.white,
       onSurface: Color(0xFFF8FAFC),
-      onBackground: Color(0xFFF8FAFC),
+    ),
+    scaffoldBackgroundColor: const Color(0xFF0B0F19),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Color(0xFF131A26),
+      foregroundColor: Color(0xFFF8FAFC),
+      elevation: 0,
+      centerTitle: false,
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: const Color(0xFF0F172A),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
     ),
     cardTheme: CardThemeData(
-      color:  Color(0xFF131A26),
+      color: const Color(0xFF131A26),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),

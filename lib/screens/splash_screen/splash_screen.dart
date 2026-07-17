@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:mpos/app_theme/app_theme.dart';
 import 'package:mpos/resources/color_resources.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../provider/auth_provider/auth_provider.dart';
 import '../../provider/splash_provider/splash_provider.dart'; // Import color resources
@@ -49,33 +48,32 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
       ),
     );
 
-
     _loadingData();
   }
 
-  void _loadingData()async{
+  void _loadingData() async {
     _animationController.forward();
     _startProgressLoader();
     final splashProvider = Provider.of<SplashProvider>(context, listen: false);
-    try{
+    try {
       Response response = await splashProvider.verifyConnection();
-      if(response.statusCode != 200){
+      if (response.statusCode != 200) {
         throw Exception('Failed to verify connection: ${response.statusCode}');
       }
-    }
-    catch(e){
+    } catch (e) {
       print('Continuing in offline demo mode: $e');
     }
 
     await Future.delayed(const Duration(milliseconds: 900));
     if (!mounted) return;
 
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    if(token != null && token.isNotEmpty){
-      await Provider.of<AuthProvider>(context, listen: false).restoreSession();
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final isTokenValid = await authProvider.verifyStoredToken();
+    if (!mounted) return;
+
+    if (isTokenValid) {
       context.go('/mainNavigation');
-    }else {
+    } else {
       _navigateToLogin();
     }
   }
@@ -103,17 +101,15 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
           _progressTimer?.cancel();
 
           // 3. Route to Login/PIN Screen
-
         }
       });
     });
   }
 
   void _navigateToLogin() {
-      if (mounted) {
-        context.go('/login');
-      }
-
+    if (mounted) {
+      context.go('/login');
+    }
   }
 
   @override
@@ -126,15 +122,15 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.background,
       body: Padding(
-        padding:  EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+        padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-               SizedBox(height: 40),
+              SizedBox(height: 40),
 
               // Animated Logo & Title Area
               Expanded(
@@ -177,7 +173,7 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
                       ),
                     ),
                     const SizedBox(height: 6),
-                     Text(
+                    Text(
                       errorMessage ?? 'Smart Business, Simplified Payments',
                       style: TextStyle(
                         fontSize: 11,
@@ -189,44 +185,48 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
                     const SizedBox(height: 40),
 
                     // Progress Indicator Area (Custom Gradient Container)
-                    errorMessage == null ? Container(
-                      width: 200,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: ColorResources.border, // Using ColorResources
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                      child: Stack(
-                        children: [
-                          FractionallySizedBox(
-                            widthFactor: _loadingProgress.clamp(0.0, 1.0),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(3),
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    ColorResources.primary,     // Using ColorResources
-                                    ColorResources.secondary,   // Using ColorResources
-                                    ColorResources.accent,      // Using ColorResources
-                                  ],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
-                                ),
-                              ),
+                    errorMessage == null
+                        ? Container(
+                            width: 200,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: ColorResources.border, // Using ColorResources
+                              borderRadius: BorderRadius.circular(3),
                             ),
-                          ),
-                        ],
-                      ),
-                    ):SizedBox(),
+                            child: Stack(
+                              children: [
+                                FractionallySizedBox(
+                                  widthFactor: _loadingProgress.clamp(0.0, 1.0),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(3),
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          ColorResources.primary,
+                                          ColorResources.secondary,
+                                          ColorResources.accent,
+                                        ],
+                                        begin: Alignment.centerLeft,
+                                        end: Alignment.centerRight,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : SizedBox(),
                     const SizedBox(height: 12),
-                    errorMessage == null ? Text(
-                      _statusText,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: ColorResources.textSecondary, // Using ColorResources
-                      ),
-                    ): SizedBox.shrink(),
+                    errorMessage == null
+                        ? Text(
+                            _statusText,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: ColorResources.textSecondary,
+                            ),
+                          )
+                        : SizedBox.shrink(),
                   ],
                 ),
               ),
@@ -249,7 +249,7 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
   }
 }
 
-// Custom Painter Logo
+// App logo
 class NovaPOSLogo extends StatelessWidget {
   const NovaPOSLogo({super.key});
 
@@ -268,68 +268,15 @@ class NovaPOSLogo extends StatelessWidget {
           ),
         ],
       ),
-      child: Center(
-        child: SizedBox(
-          width: 80,
-          height: 80,
-          child: CustomPaint(
-            painter: _LogoPainter(),
-          ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Image.asset(
+          'assets/image/logo/novapos.png',
+          fit: BoxFit.contain,
+          semanticLabel: 'NovaPOS logo',
         ),
       ),
     );
   }
 }
 
-class _LogoPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    // 1. Paint Outer Terminal Shell
-    final shellPaint = Paint()
-      ..color = ColorResources.primary // Using ColorResources
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5.0
-      ..strokeJoin = StrokeJoin.round;
-
-    final shellRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(15, 8, 50, 64),
-      const Radius.circular(10),
-    );
-    canvas.drawRRect(shellRect, shellPaint);
-
-    // 2. Paint Card Slot
-    final slotPaint = Paint()
-      ..color = ColorResources.primary // Using ColorResources
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4.0
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(const Offset(22, 20), const Offset(58, 20), slotPaint);
-
-    // 3. Paint Receipt Slot
-    final receiptPaint = Paint()
-      ..color = ColorResources.primary // Using ColorResources
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(const Offset(30, 14), const Offset(50, 14), receiptPaint);
-
-    // 4. Paint Lightning Bolt
-    final boltPaint = Paint()
-      ..color = ColorResources.secondary // Using ColorResources
-      ..style = PaintingStyle.fill;
-
-    final boltPath = Path()
-      ..moveTo(40, 32)
-      ..lineTo(48, 44)
-      ..lineTo(38, 44)
-      ..lineTo(42, 56)
-      ..lineTo(32, 44)
-      ..lineTo(42, 44)
-      ..close();
-
-    canvas.drawPath(boltPath, boltPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

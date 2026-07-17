@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mpos/dio_client/dio_client.dart';
 import 'package:mpos/resources/api_routes.dart';
+import 'package:mpos/utils/app_back_scope.dart';
 
 class PosPaymentScreen extends StatefulWidget {
   final double subtotal;
@@ -305,10 +306,22 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
     try {
       final response = await _dio.get(ApiRoutes.storeProfile);
       final data = _asMap(response.data);
-      return _asMap(data['store_profile']);
+      return _extractStoreProfile(data);
     } catch (_) {
       return {};
     }
+  }
+
+  Map<String, dynamic> _extractStoreProfile(Map<String, dynamic> payload) {
+    for (final key in ['store_profile', 'storeProfile', 'profile', 'data']) {
+      final value = _asMap(payload[key]);
+      if (value.isNotEmpty) return value;
+    }
+    if (payload.containsKey('store_name') ||
+        payload.containsKey('legal_name')) {
+      return payload;
+    }
+    return {};
   }
 
   List<Map<String, dynamic>> _extractRows(dynamic payload) {
@@ -364,138 +377,137 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
     return text;
   }
 
+  void _goBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/pos_terminal');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isCredit = paymentMethod == 'Credit';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FB),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/mainNavigation');
-            }
-          },
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF111827)),
-        ),
-        title: const Text(
-          'Complete Payment',
-          style: TextStyle(
-            fontSize: 16,
-            color: Color(0xFF111827),
-            fontWeight: FontWeight.w800,
+    return AppBackScope(
+      fallbackRoute: '/pos_terminal',
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(
+          leading: IconButton(
+            onPressed: _goBack,
+            icon: const Icon(Icons.arrow_back),
+          ),
+          title: const Text(
+            'Complete Payment',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
           ),
         ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(14),
-                children: [
-                  _TotalCard(total: widget.total),
-                  const SizedBox(height: 14),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(14),
+                  children: [
+                    _TotalCard(total: widget.total),
+                    const SizedBox(height: 14),
 
-                  _PaymentMethods(
-                    selected: paymentMethod,
-                    onChanged: (value) {
-                      setState(() {
-                        paymentMethod = value;
-
-                        if (value == 'Cash' || value == 'Credit') {
-                          amountPaid = 0;
-                        } else {
-                          amountPaid = widget.total;
-                        }
-                      });
-                    },
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  if (isCredit) ...[
-                    _CreditBox(
-                      customers: creditCustomers,
-                      selectedCustomer: selectedCustomer,
-                      dueDays: dueDays,
-                      availableCredit: availableCredit,
-                      creditAmount: creditAmount,
-                      isLoading: isLoadingCustomers,
-                      onCustomerChanged: (value) {
+                    _PaymentMethods(
+                      selected: paymentMethod,
+                      onChanged: (value) {
                         setState(() {
-                          selectedCustomer = value;
-                        });
-                      },
-                      onDueDaysChanged: (value) {
-                        setState(() {
-                          dueDays = value;
+                          paymentMethod = value;
+
+                          if (value == 'Cash' || value == 'Credit') {
+                            amountPaid = 0;
+                          } else {
+                            amountPaid = widget.total;
+                          }
                         });
                       },
                     ),
+
                     const SizedBox(height: 14),
-                  ],
 
-                  _AmountBox(
-                    paymentMethod: paymentMethod,
-                    amountPaid: amountPaid,
-                    total: widget.total,
-                    balanceDue: balanceDue,
-                    changeDue: changeDue,
-                    creditAmount: creditAmount,
-                    onAmountChanged: (value) {
-                      setState(() {
-                        amountPaid = value;
-                      });
-                    },
-                  ),
+                    if (isCredit) ...[
+                      _CreditBox(
+                        customers: creditCustomers,
+                        selectedCustomer: selectedCustomer,
+                        dueDays: dueDays,
+                        availableCredit: availableCredit,
+                        creditAmount: creditAmount,
+                        isLoading: isLoadingCustomers,
+                        onCustomerChanged: (value) {
+                          setState(() {
+                            selectedCustomer = value;
+                          });
+                        },
+                        onDueDaysChanged: (value) {
+                          setState(() {
+                            dueDays = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                    ],
 
-                  const SizedBox(height: 14),
-                  _OrderSummary(
-                    subtotal: widget.subtotal,
-                    discount: widget.discount,
-                    tax: widget.tax,
-                    total: widget.total,
-                    cart: widget.cart,
-                  ),
+                    _AmountBox(
+                      paymentMethod: paymentMethod,
+                      amountPaid: amountPaid,
+                      total: widget.total,
+                      balanceDue: balanceDue,
+                      changeDue: changeDue,
+                      creditAmount: creditAmount,
+                      onAmountChanged: (value) {
+                        setState(() {
+                          amountPaid = value;
+                        });
+                      },
+                    ),
 
-                  if (!canComplete)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Text(
-                        paymentMethod == 'Cash'
-                            ? 'Enter enough cash to complete payment.'
-                            : paymentMethod == 'Credit'
-                            ? 'Select active customer and valid credit amount.'
-                            : widget.cart.isEmpty
-                            ? 'Add at least one item to complete payment.'
-                            : '',
-                        style: const TextStyle(
-                          color: Color(0xFFEF4444),
-                          fontWeight: FontWeight.w700,
+                    const SizedBox(height: 14),
+                    _OrderSummary(
+                      subtotal: widget.subtotal,
+                      discount: widget.discount,
+                      tax: widget.tax,
+                      total: widget.total,
+                      cart: widget.cart,
+                    ),
+
+                    if (!canComplete)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Text(
+                          paymentMethod == 'Cash'
+                              ? 'Enter enough cash to complete payment.'
+                              : paymentMethod == 'Credit'
+                              ? 'Select active customer and valid credit amount.'
+                              : widget.cart.isEmpty
+                              ? 'Add at least one item to complete payment.'
+                              : '',
+                          style: const TextStyle(
+                            color: Color(0xFFEF4444),
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            _Keypad(
-              onTap: addAmount,
-              onBackspace: removeAmount,
-              onComplete: completePayment,
-              canComplete: canComplete && !isSubmitting,
-              buttonText: isCredit
-                  ? 'Complete Credit ${money(creditAmount)}'
-                  : 'Complete ${money(widget.total)}',
-              isSubmitting: isSubmitting,
-            ),
-          ],
+              _Keypad(
+                onTap: addAmount,
+                onBackspace: removeAmount,
+                onComplete: completePayment,
+                canComplete: canComplete && !isSubmitting,
+                buttonText: isCredit
+                    ? 'Complete Credit ${money(creditAmount)}'
+                    : 'Complete ${money(widget.total)}',
+                isSubmitting: isSubmitting,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -511,7 +523,7 @@ class _TotalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -553,11 +565,11 @@ class _PaymentMethods extends StatelessWidget {
               onPressed: () => onChanged(method),
               style: OutlinedButton.styleFrom(
                 backgroundColor: active
-                    ? const Color(0xFF111827)
-                    : Colors.white,
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).cardColor,
                 foregroundColor: active
                     ? Colors.white
-                    : const Color(0xFF111827),
+                    : Theme.of(context).colorScheme.onSurface,
                 padding: const EdgeInsets.symmetric(vertical: 13),
               ),
               child: Text(method),
@@ -594,7 +606,7 @@ class _AmountBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Column(
         children: [
           TextField(
@@ -654,7 +666,7 @@ class _CreditBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Column(
         children: [
           if (isLoading)
@@ -724,7 +736,7 @@ class _OrderSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -772,8 +784,8 @@ class _InfoRow extends StatelessWidget {
               label,
               style: TextStyle(
                 color: strong
-                    ? const Color(0xFF111827)
-                    : const Color(0xFF6B7280),
+                    ? Theme.of(context).colorScheme.onSurface
+                    : Theme.of(context).hintColor,
                 fontWeight: strong ? FontWeight.w800 : FontWeight.w500,
               ),
             ),
@@ -781,7 +793,9 @@ class _InfoRow extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              color: strong ? const Color(0xFF23C16B) : const Color(0xFF111827),
+              color: strong
+                  ? const Color(0xFF23C16B)
+                  : Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -814,9 +828,9 @@ class _Keypad extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        boxShadow: const [
           BoxShadow(
             color: Color(0x1A000000),
             blurRadius: 18,
@@ -839,8 +853,8 @@ class _Keypad extends StatelessWidget {
                 ...keys.map(
                   (key) => ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF3F4F6),
-                      foregroundColor: const Color(0xFF111827),
+                      backgroundColor: Theme.of(context).colorScheme.surface,
+                      foregroundColor: Theme.of(context).colorScheme.onSurface,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -857,8 +871,8 @@ class _Keypad extends StatelessWidget {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF3F4F6),
-                    foregroundColor: const Color(0xFF111827),
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    foregroundColor: Theme.of(context).colorScheme.onSurface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -868,8 +882,8 @@ class _Keypad extends StatelessWidget {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF3F4F6),
-                    foregroundColor: const Color(0xFF111827),
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    foregroundColor: Theme.of(context).colorScheme.onSurface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -906,11 +920,11 @@ class _Keypad extends StatelessWidget {
   }
 }
 
-BoxDecoration _cardDecoration() {
+BoxDecoration _cardDecoration(BuildContext context) {
   return BoxDecoration(
-    color: Colors.white,
+    color: Theme.of(context).cardColor,
     borderRadius: BorderRadius.circular(14),
-    border: Border.all(color: const Color(0xFFE5E7EB)),
+    border: Border.all(color: Theme.of(context).dividerColor),
     boxShadow: const [
       BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, 4)),
     ],
