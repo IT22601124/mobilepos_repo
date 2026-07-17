@@ -6,10 +6,10 @@ class SummaryCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      ['Bills', '18', Icons.receipt_long, const Color(0xFF23C16B)],
-      ['Items', '35', Icons.shopping_bag_outlined, const Color(0xFFE056FD)],
-      ['Held', '3', Icons.pause_circle_outline, const Color(0xFFF59E0B)],
-      ['Cashiers', '4', Icons.people_outline, const Color(0xFF2F80ED)],
+      ['Bills', '0', Icons.receipt_long, const Color(0xFF23C16B)],
+      ['Items', '0', Icons.shopping_bag_outlined, const Color(0xFFE056FD)],
+      ['Held', '0', Icons.pause_circle_outline, const Color(0xFFF59E0B)],
+      ['Cashiers', '0', Icons.people_outline, const Color(0xFF2F80ED)],
     ];
 
     return GridView.count(

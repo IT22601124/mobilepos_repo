@@ -5,12 +5,7 @@ class ProductStockList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final products = [
-      ['Milk 1L', 'DRY-001', 18, 'Active'],
-      ['Basmati Rice 5kg', 'GRY-101', 22, 'Active'],
-      ['Cheddar Cheese', 'DRY-002', 9, 'Low stock'],
-      ['Orange Juice', 'BEV-031', 20, 'Active'],
-    ];
+    final products = [];
 
     return Column(
       children: products.map((item) {

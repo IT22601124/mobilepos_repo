@@ -20,42 +20,7 @@ class PosTerminalScreen extends StatefulWidget {
 class _PosTerminalScreenState extends State<PosTerminalScreen> {
   final _dio = DioClient().dio;
 
-  final List<Map<String, dynamic>> _fallbackProducts = [
-    {
-      'id': 1,
-      'name': 'Milk 1L',
-      'sku': 'DRY-001',
-      'price': 420.0,
-      'stock': 18,
-      'category': 'Dairy',
-    },
-    {
-      'id': 2,
-      'name': 'Basmati Rice 5kg',
-      'sku': 'GRY-101',
-      'price': 3450.0,
-      'stock': 22,
-      'category': 'Grocery',
-    },
-    {
-      'id': 3,
-      'name': 'Coconut Oil 1L',
-      'sku': 'GRY-102',
-      'price': 910.0,
-      'stock': 16,
-      'category': 'Grocery',
-    },
-    {
-      'id': 4,
-      'name': 'Orange Juice',
-      'sku': 'BEV-031',
-      'price': 520.0,
-      'stock': 20,
-      'category': 'Beverage',
-    },
-  ];
-
-  late List<Map<String, dynamic>> products = List.of(_fallbackProducts);
+  late List<Map<String, dynamic>> products = [];
   final List<Map<String, dynamic>> cart = [];
 
   String selectedCategory = 'All';
@@ -157,17 +122,15 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
           .toList();
 
       setState(() {
-        products = loadedProducts.isEmpty
-            ? List.of(_fallbackProducts)
-            : loadedProducts;
+        products = loadedProducts;
         categories = ['All', ...loadedCategories];
         if (!categories.contains(selectedCategory)) selectedCategory = 'All';
       });
     } catch (apiError) {
       setState(() {
-        products = List.of(_fallbackProducts);
-        categories = ['All', 'Dairy', 'Grocery', 'Beverage'];
-        error = 'Using sample catalog. ${apiError.toString()}';
+        products = [];
+        categories = ['All'];
+        error = 'Failed to load catalog. ${apiError.toString()}';
       });
     } finally {
       if (mounted) setState(() => isLoading = false);
@@ -418,19 +381,22 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
       fallbackRoute: '/mainNavigation',
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: _TerminalHeader(
+            cartCount: cart.fold<int>(
+              0,
+              (sum, item) => sum + ((item['qty'] as num?)?.toInt() ?? 0),
+            ),
+            total: money(total),
+            isLoading: isLoading,
+            onRefresh: _loadCatalog,
+            onHeldOrders: showHeldOrders,
+            onHome: () => context.go('/mainNavigation'),
+          ),
+        ),
         body: Column(
           children: [
-            _TerminalHeader(
-              cartCount: cart.fold<int>(
-                0,
-                (sum, item) => sum + ((item['qty'] as num?)?.toInt() ?? 0),
-              ),
-              total: money(total),
-              isLoading: isLoading,
-              onRefresh: _loadCatalog,
-              onHeldOrders: showHeldOrders,
-              onHome: () => context.go('/mainNavigation'),
-            ),
             SearchBox(
               onChanged: (value) {
                 setState(() {
@@ -447,20 +413,21 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
                 });
               },
             ),
+            const SizedBox(height: 8),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 children: [
                   if (error != null)
                     _CatalogNotice(message: error!, onRetry: _loadCatalog),
                   if (isLoading)
                     const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(child: CircularProgressIndicator()),
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: Center(child: CircularProgressIndicator(strokeWidth: 3)),
                     ),
                   _SectionHeader(
                     title: 'Products',
-                    subtitle: '${filteredProducts.length} available',
+                    subtitle: '${filteredProducts.length} items',
                   ),
                   const SizedBox(height: 10),
                   ...filteredProducts.map(
@@ -469,11 +436,11 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
                       onTap: () => addToCart(product),
                     ),
                   ),
-                  if (filteredProducts.isEmpty) const _NoProductsFound(),
-                  const SizedBox(height: 14),
+                  if (filteredProducts.isEmpty && !isLoading) const _NoProductsFound(),
+                  const SizedBox(height: 20),
                   _SectionHeader(
-                    title: 'Cart',
-                    subtitle: '${cart.length} selected',
+                    title: 'Current Cart',
+                    subtitle: '${cart.length} unique',
                   ),
                   const SizedBox(height: 10),
                   if (cart.isEmpty)
@@ -489,6 +456,7 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
                         onRemove: () => updateQty(entry.key, 0),
                       ),
                     ),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -498,6 +466,7 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
               tax: tax,
               total: total,
               paymentMethod: paymentMethod,
+              isCartEmpty: cart.isEmpty,
               onDiscountChanged: (value) {
                 setState(() {
                   discount = value.clamp(0, subtotal).toDouble();
@@ -537,72 +506,100 @@ class _TerminalHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      bottom: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          border: Border(
-            bottom: BorderSide(color: Theme.of(context).dividerColor),
+    return AppBar(
+      backgroundColor: Theme.of(context).cardColor,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      centerTitle: false,
+      leading: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            Icons.point_of_sale_rounded,
+            color: Theme.of(context).colorScheme.primary,
+            size: 20,
           ),
         ),
-        child: Row(
-          children: [
-            Container(
-              height: 44,
-              width: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.point_of_sale, color: Color(0xFF2F80ED)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'POS Terminal',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '$cartCount item${cartCount == 1 ? '' : 's'} | $total',
-                    style: const TextStyle(
-                      color: Color(0xFF6B7280),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              tooltip: 'Held orders',
-              onPressed: onHeldOrders,
-              icon: const Icon(Icons.pause_circle_outline),
-            ),
-            IconButton(
-              tooltip: 'Refresh catalog',
-              onPressed: isLoading ? null : onRefresh,
-              icon: isLoading
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh),
-            ),
-            IconButton(
-              tooltip: 'Home',
-              onPressed: onHome,
-              icon: const Icon(Icons.home_outlined),
-            ),
-          ],
-        ),
       ),
+      titleSpacing: 0,
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Terminal',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+            ),
+          ),
+          Text(
+            '$cartCount items • $total',
+            style: TextStyle(
+              color: Theme.of(context).hintColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        _HeaderAction(
+          icon: Icons.pause_circle_filled_rounded,
+          onTap: onHeldOrders,
+          tooltip: 'Held Orders',
+        ),
+        _HeaderAction(
+          icon: isLoading ? Icons.hourglass_empty_rounded : Icons.refresh_rounded,
+          onTap: isLoading ? null : onRefresh,
+          tooltip: 'Refresh',
+          isLoading: isLoading,
+        ),
+        _HeaderAction(
+          icon: Icons.home_rounded,
+          onTap: onHome,
+          tooltip: 'Home',
+        ),
+        const SizedBox(width: 8),
+      ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Divider(height: 1, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+      ),
+    );
+  }
+}
+
+class _HeaderAction extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final String tooltip;
+  final bool isLoading;
+
+  const _HeaderAction({
+    required this.icon,
+    this.onTap,
+    required this.tooltip,
+    this.isLoading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onTap,
+      tooltip: tooltip,
+      icon: isLoading
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            )
+          : Icon(icon, size: 22, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
     );
   }
 }
@@ -1054,10 +1051,13 @@ double _toDoubleStatic(dynamic value) {
 BoxDecoration _cardDecoration(BuildContext context) {
   return BoxDecoration(
     color: Theme.of(context).cardColor,
-    borderRadius: BorderRadius.circular(14),
-    border: Border.all(color: Theme.of(context).dividerColor),
-    boxShadow: const [
-      BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, 4)),
+    borderRadius: BorderRadius.circular(12),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.04),
+        blurRadius: 10,
+        offset: const Offset(0, 4),
+      ),
     ],
   );
 }

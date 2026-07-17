@@ -5,11 +5,7 @@ class CreditCustomerList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final customers = [
-      ['Tharindu Stores', '0787450363', 'LKR 50,000', 'LKR 12,500'],
-      ['Colombo Mini Mart', '0771122334', 'LKR 35,000', 'LKR 8,000'],
-      ['Kandy Wholesale', '0714455667', 'LKR 75,000', 'LKR 72,000'],
-    ];
+    final customers = [];
 
     return Column(
       children: customers.map((item) {

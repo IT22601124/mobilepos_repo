@@ -44,22 +44,6 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
       'balance': 0.0,
       'status': false,
     },
-    {
-      'name': 'Tharindu Stores',
-      'id': 1,
-      'phone': '0787450363',
-      'creditLimit': 50000.0,
-      'balance': 12500.0,
-      'status': true,
-    },
-    {
-      'name': 'Colombo Mini Mart',
-      'id': 2,
-      'phone': '0771122334',
-      'creditLimit': 35000.0,
-      'balance': 8000.0,
-      'status': true,
-    },
   ];
 
   @override

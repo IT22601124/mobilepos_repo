@@ -31,8 +31,8 @@ class DioClient {
       createHttpClient: () {
         final client = HttpClient();
         client.badCertificateCallback = (certificate, host, port) {
-          if (kReleaseMode || !ApiRoutes.allowBadCertificates) return false;
-          return host == Uri.parse(ApiRoutes.serverUrl).host;
+          if (kReleaseMode) return false;
+          return true; // Allow all certificates in debug mode
         };
         return client;
       },

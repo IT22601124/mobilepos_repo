@@ -127,24 +127,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           ),
           _FieldConfig('status', 'Status', options: _statusOptions),
         ],
-        sample: [
-          {
-            'id': 1,
-            'name': 'Milk 1L',
-            'product_code': 'DRY-001',
-            'selling_price': 420,
-            'stock_quantity': 18,
-            'status': true,
-          },
-          {
-            'id': 2,
-            'name': 'Basmati Rice 5kg',
-            'product_code': 'GRY-101',
-            'selling_price': 3450,
-            'stock_quantity': 22,
-            'status': true,
-          },
-        ],
+        sample: [],
       ),
       _simpleResource(
         'Categories',
@@ -174,10 +157,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           _FieldConfig('short_name', 'Short name', required: true),
           _FieldConfig('status', 'Status', options: _statusOptions),
         ],
-        sample: [
-          {'id': 1, 'name': 'Pieces', 'short_name': 'pcs', 'status': true},
-          {'id': 2, 'name': 'Kilogram', 'short_name': 'kg', 'status': true},
-        ],
+        sample: [],
       ),
       _ResourceConfig(
         tab: 'Suppliers',
@@ -197,14 +177,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           _FieldConfig('address', 'Address'),
           _FieldConfig('status', 'Status', options: _statusOptions),
         ],
-        sample: [
-          {
-            'id': 1,
-            'name': 'Kandy Food Suppliers',
-            'phone': '0771122334',
-            'status': true,
-          },
-        ],
+        sample: [],
       ),
       _ResourceConfig(
         tab: 'Product suppliers',
@@ -234,9 +207,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
             keyboardType: TextInputType.number,
           ),
         ],
-        sample: [
-          {'id': 1, 'product_id': 1, 'supplier_id': 1, 'supplier_price': 360},
-        ],
+        sample: [],
       ),
       _ResourceConfig(
         tab: 'Stock movements',
@@ -276,22 +247,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           ),
           _FieldConfig('remarks', 'Remarks'),
         ],
-        sample: [
-          {
-            'id': 1,
-            'type': 'purchase',
-            'product_id': 2,
-            'quantity': 20,
-            'created_at': 'Today',
-          },
-          {
-            'id': 2,
-            'type': 'sale',
-            'product_id': 1,
-            'quantity': -2,
-            'created_at': 'Today',
-          },
-        ],
+        sample: [],
       ),
       _ResourceConfig(
         tab: 'Batches',
@@ -327,15 +283,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           _FieldConfig('manufacture_date', 'Manufacture date'),
           _FieldConfig('expiry_date', 'Expiry date'),
         ],
-        sample: [
-          {
-            'id': 1,
-            'batch_no': 'BATCH-001',
-            'product_id': 1,
-            'quantity': 18,
-            'expiry_date': '2026-08-20',
-          },
-        ],
+        sample: [],
       ),
       _ResourceConfig(
         tab: 'Images',
@@ -354,9 +302,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           ),
           _FieldConfig('image_path', 'Image path', required: true),
         ],
-        sample: [
-          {'id': 1, 'product_id': 1, 'image_path': '/products/milk.png'},
-        ],
+        sample: [],
       ),
       _ResourceConfig(
         tab: 'Taxes',
@@ -374,9 +320,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           ),
           _FieldConfig('status', 'Status', options: _statusOptions),
         ],
-        sample: [
-          {'id': 1, 'name': 'VAT', 'percentage': 8, 'status': true},
-        ],
+        sample: [],
       ),
       _ResourceConfig(
         tab: 'Discounts',
@@ -401,15 +345,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           _FieldConfig('end_date', 'End date'),
           _FieldConfig('status', 'Status', options: _statusOptions),
         ],
-        sample: [
-          {
-            'id': 1,
-            'name': 'New Year Discount',
-            'discount_type': 'fixed',
-            'value': 500,
-            'status': true,
-          },
-        ],
+        sample: [],
       ),
       _ResourceConfig(
         tab: 'Variants',
@@ -444,15 +380,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
             keyboardType: TextInputType.number,
           ),
         ],
-        sample: [
-          {
-            'id': 1,
-            'name': 'Rice 1kg',
-            'product_id': 2,
-            'selling_price': 720,
-            'stock_quantity': 35,
-          },
-        ],
+        sample: [],
       ),
       _ResourceConfig(
         tab: 'Customers',
@@ -482,22 +410,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           ),
           _FieldConfig('status', 'Status', options: _statusOptions),
         ],
-        sample: [
-          {
-            'id': 1,
-            'name': 'Tharindu Stores',
-            'credit_limit': 50000,
-            'current_balance': 12500,
-            'status': 'active',
-          },
-          {
-            'id': 2,
-            'name': 'Colombo Mini Mart',
-            'credit_limit': 35000,
-            'current_balance': 8000,
-            'status': 'active',
-          },
-        ],
+        sample: [],
       ),
       _ResourceConfig(
         tab: 'Credit ledger',
@@ -536,15 +449,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           ),
           _FieldConfig('remarks', 'Remarks'),
         ],
-        sample: [
-          {
-            'id': 1,
-            'customer_id': 1,
-            'type': 'credit_sale',
-            'amount': 12500,
-            'reference_id': 1,
-          },
-        ],
+        sample: [],
       ),
       _ResourceConfig(
         tab: 'Branches',
@@ -565,15 +470,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           _FieldConfig('address', 'Address'),
           _FieldConfig('status', 'Status', options: _statusOptions),
         ],
-        sample: [
-          {
-            'id': 1,
-            'name': 'Main Branch',
-            'code': 'MAIN',
-            'phone': '0777123456',
-            'status': true,
-          },
-        ],
+        sample: [],
       ),
       _ResourceConfig(
         tab: 'Roles',
@@ -588,9 +485,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           _FieldConfig('description', 'Description'),
           _FieldConfig('status', 'Status', options: _statusOptions),
         ],
-        sample: [
-          {'id': 1, 'name': 'Cashier', 'role_name': 'Cashier', 'status': true},
-        ],
+        sample: [],
       ),
       _ResourceConfig(
         tab: 'Users',
@@ -603,15 +498,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         canCreate: false,
         canEdit: false,
         canDelete: false,
-        sample: [
-          {
-            'id': 1,
-            'name': 'Super Admin',
-            'phone': '0777123456',
-            'role_name': 'Super Admin',
-            'status': true,
-          },
-        ],
+        sample: [],
       ),
       _ResourceConfig(
         tab: 'POS sales',
@@ -682,15 +569,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         canEdit: false,
         canDelete: false,
         canUpdateStatus: true,
-        sample: [
-          {
-            'id': 1,
-            'sale_no': 'SALE-001',
-            'payment_method': 'cash',
-            'grand_total': 3870,
-            'status': 'completed',
-          },
-        ],
+        sample: [],
       ),
       _ResourceConfig.report(),
       _ResourceConfig.settings(),
@@ -754,7 +633,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     } catch (error) {
       setState(() {
         _error = _messageFor(error);
-        _records = resource.sample;
+        _records = [];
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);

@@ -19,90 +19,100 @@ class CartItem extends StatelessWidget {
     final lineTotal = item['price'] * item['qty'];
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: cardDecoration(context),
-      child: Row(
-        children: [
-          Container(
-            height: 40,
-            width: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.shopping_bag_outlined,
-              color: Color(0xFF2F80ED),
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item['name'],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                Text(
-                  'LKR ${item['price'].toStringAsFixed(0)} each',
-                  style: TextStyle(color: Theme.of(context).hintColor),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            height: 36,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Theme.of(context).dividerColor),
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: onMinus,
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.remove, size: 18),
-                ),
-                Text(
-                  '${item['qty']}',
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                IconButton(
-                  onPressed: onPlus,
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.add, size: 18),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'LKR ${lineTotal.toStringAsFixed(0)}',
-            style: const TextStyle(fontWeight: FontWeight.w900),
-          ),
-          IconButton(
-            onPressed: onRemove,
-            icon: const Icon(Icons.close, size: 18),
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item['name'],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'LKR ${item['price'].toStringAsFixed(0)} each',
+                    style: TextStyle(
+                      color: Theme.of(context).hintColor,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _QtyBtn(icon: Icons.remove, onTap: onMinus),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      '${item['qty']}',
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                  _QtyBtn(icon: Icons.add, onTap: onPlus),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 70,
+              child: Text(
+                'LKR ${lineTotal.toStringAsFixed(0)}',
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+            IconButton(
+              onPressed: onRemove,
+              icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFEF4444)),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-BoxDecoration cardDecoration(BuildContext context) {
-  return BoxDecoration(
-    color: Theme.of(context).cardColor,
-    borderRadius: BorderRadius.circular(10),
-    border: Border.all(color: Theme.of(context).dividerColor),
-    boxShadow: const [
-      BoxShadow(color: Color(0x0D000000), blurRadius: 10, offset: Offset(0, 3)),
-    ],
-  );
+class _QtyBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _QtyBtn({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Icon(icon, size: 16, color: const Color(0xFF4B5563)),
+      ),
+    );
+  }
 }

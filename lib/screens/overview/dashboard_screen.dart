@@ -203,58 +203,16 @@ class _DashboardData {
   factory _DashboardData.fallback() {
     return _DashboardData(
       metrics: const _DashboardMetrics(
-        netSales: 30078,
-        collected: 24142,
-        creditDue: 5936,
-        itemsSold: 35,
-        todayTarget: 50000,
-        targetProgress: 60,
+        netSales: 0,
+        collected: 0,
+        creditDue: 0,
+        itemsSold: 0,
+        todayTarget: 0,
+        targetProgress: 0,
       ),
-      chart: const [
-        _ChartPoint(label: 'Day 1', total: 9000),
-        _ChartPoint(label: 'Day 2', total: 15000),
-        _ChartPoint(label: 'Day 3', total: 11000),
-        _ChartPoint(label: 'Day 4', total: 22000),
-        _ChartPoint(label: 'Day 5', total: 18000),
-        _ChartPoint(label: 'Day 6', total: 27000),
-        _ChartPoint(label: 'Today', total: 30078),
-      ],
-      cashiers: const [
-        _CashierSummary(
-          name: 'Super Admin',
-          role: 'Super Admin',
-          totalSales: 20142,
-          collected: 20142,
-          credit: 0,
-        ),
-        _CashierSummary(
-          name: 'Cashier 01',
-          role: 'Cashier',
-          totalSales: 9936,
-          collected: 4000,
-          credit: 5936,
-        ),
-      ],
-      recentSales: const [
-        _RecentSale(
-          saleNo: 'POS-001',
-          customer: 'Walk-in customer',
-          total: 13068,
-          paymentMethod: 'Cash',
-        ),
-        _RecentSale(
-          saleNo: 'POS-002',
-          customer: 'Tharindu Stores',
-          total: 9936,
-          paymentMethod: 'Credit',
-        ),
-        _RecentSale(
-          saleNo: 'POS-003',
-          customer: 'Colombo Mini Mart',
-          total: 7074,
-          paymentMethod: 'Card',
-        ),
-      ],
+      chart: const [],
+      cashiers: const [],
+      recentSales: const [],
       storeName: 'NOVA POS',
     );
   }

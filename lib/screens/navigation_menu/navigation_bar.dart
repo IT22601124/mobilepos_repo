@@ -136,49 +136,54 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
           },
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        bottomNavigationBar: AnimatedBottomNavigationBar.builder(
-          height: 80,
-          itemCount: iconList.length,
-          tabBuilder: (int index, bool isActive) {
-            final color = isActive ? colors.secondary : colors.onPrimary;
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(iconList[index], size: 24, color: color),
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: AutoSizeText(
-                    index == 0
-                        ? 'Dashboard'
-                        : index == 1
-                            ? 'Pos'
-                            : index == 2
-                                ? 'Settings'
-                                : 'Profile',
-                    maxLines: 1,
-                    style: TextStyle(color: color),
-                    group: autoSizeGroup,
-                  ),
+      bottomNavigationBar: AnimatedBottomNavigationBar.builder(
+        height: 52,
+        itemCount: iconList.length,
+        tabBuilder: (int index, bool isActive) {
+          final color = isActive ? colors.secondary : colors.onPrimary.withValues(alpha: 0.6);
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                iconList[index],
+                size: 20,
+                color: color,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                index == 0
+                    ? 'Home'
+                    : index == 1
+                        ? 'Items'
+                        : index == 2
+                            ? 'Admin'
+                            : 'User',
+                maxLines: 1,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 10,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                  letterSpacing: 0.2,
                 ),
-              ],
-            );
-          },
-          backgroundColor: const Color(0xFF111184),
-          activeIndex: _bottomNavIndex,
-          splashColor: Colors.green,
-          notchAndCornersAnimation: borderRadiusAnimation,
-          splashSpeedInMilliseconds: 300,
-          notchSmoothness: NotchSmoothness.defaultEdge,
-          gapLocation: GapLocation.center,
-          leftCornerRadius: 32,
-          rightCornerRadius: 32,
-          onTap: (index) {
-            setState(() => _bottomNavIndex = index);
-          },
-          hideAnimationController: _hideBottomBarAnimationController,
-        ),
+              ),
+            ],
+          );
+        },
+        backgroundColor: const Color(0xFF0F172A), // Deep Slate/Blue
+        activeIndex: _bottomNavIndex,
+        splashColor: colors.secondary.withValues(alpha: 0.3),
+        notchAndCornersAnimation: borderRadiusAnimation,
+        splashSpeedInMilliseconds: 300,
+        notchSmoothness: NotchSmoothness.softEdge,
+        gapLocation: GapLocation.center,
+        leftCornerRadius: 24,
+        rightCornerRadius: 24,
+        onTap: (index) {
+          setState(() => _bottomNavIndex = index);
+        },
+        hideAnimationController: _hideBottomBarAnimationController,
+      ),
       ),
     );
   }

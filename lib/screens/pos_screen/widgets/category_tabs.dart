@@ -15,8 +15,8 @@ class CategoryTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 50,
-      color: Theme.of(context).scaffoldBackgroundColor,
+      height: 34,
+      margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 14),
         scrollDirection: Axis.horizontal,
@@ -24,26 +24,35 @@ class CategoryTabs extends StatelessWidget {
           final category = categories[index];
           final active = category == selectedCategory;
 
-          return ChoiceChip(
-            label: Text(category),
-            selected: active,
-            selectedColor: const Color(0xFF23C16B),
-            backgroundColor: Theme.of(context).cardColor,
-            side: BorderSide(
-              color: active
-                  ? const Color(0xFF23C16B)
-                  : Theme.of(context).dividerColor,
+          return InkWell(
+            onTap: () => onChanged(category),
+            borderRadius: BorderRadius.circular(8),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: active
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: active
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).dividerColor.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Text(
+                category,
+                style: TextStyle(
+                  color: active
+                      ? Colors.white
+                      : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
             ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            labelStyle: TextStyle(
-              color: active
-                  ? Colors.white
-                  : Theme.of(context).colorScheme.onSurface,
-              fontWeight: FontWeight.w700,
-            ),
-            onSelected: (_) => onChanged(category),
           );
         },
         separatorBuilder: (context, index) => const SizedBox(width: 8),

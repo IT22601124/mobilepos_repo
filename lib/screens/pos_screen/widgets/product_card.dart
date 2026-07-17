@@ -11,105 +11,112 @@ class ProductCard extends StatelessWidget {
     final stock = (product['stock'] as num?)?.toInt() ?? 0;
     final lowStock = stock <= 5;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 9),
-        padding: const EdgeInsets.all(12),
-        decoration: _cardDecoration(context),
-        child: Row(
-          children: [
-            Container(
-              height: 46,
-              width: 46,
-              decoration: BoxDecoration(
-                color: lowStock
-                    ? const Color(0xFFFFFBEB)
-                    : const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.inventory_2_outlined,
-                color: lowStock
-                    ? const Color(0xFFF59E0B)
-                    : const Color(0xFF2F80ED),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product['name'],
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${product['sku']}  |  ${product['category']}',
-                    style: TextStyle(
-                      color: Theme.of(context).hintColor,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: lowStock
-                          ? const Color(0xFFFFFBEB)
-                          : const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      lowStock ? 'Low stock: $stock' : 'Stock $stock',
-                      style: TextStyle(
-                        color: lowStock
-                            ? const Color(0xFFB45309)
-                            : const Color(0xFF15803D),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
               children: [
-                Text(
-                  'LKR ${product['price'].toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15,
+                Container(
+                  height: 48,
+                  width: 48,
+                  decoration: BoxDecoration(
+                    color: lowStock
+                        ? const Color(0xFFFEF3C7)
+                        : const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    lowStock
+                        ? Icons.warning_amber_rounded
+                        : Icons.inventory_2_outlined,
+                    color: lowStock
+                        ? const Color(0xFFD97706)
+                        : const Color(0xFF4B5563),
+                    size: 22,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Icon(Icons.add_circle, color: Color(0xFF23C16B)),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product['name'],
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${product['sku']}  •  ${product['category']}',
+                        style: TextStyle(
+                          color: Theme.of(context).hintColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'LKR ${product['price'].toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: lowStock
+                            ? const Color(0xFFFEF3C7)
+                            : const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        lowStock ? 'Low Stock: $stock' : 'Stock: $stock',
+                        style: TextStyle(
+                          color: lowStock
+                              ? const Color(0xFF92400E)
+                              : const Color(0xFF166534),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
-}
-
-BoxDecoration _cardDecoration(BuildContext context) {
-  return BoxDecoration(
-    color: Theme.of(context).cardColor,
-    borderRadius: BorderRadius.circular(10),
-    border: Border.all(color: Theme.of(context).dividerColor),
-    boxShadow: const [
-      BoxShadow(color: Color(0x0D000000), blurRadius: 10, offset: Offset(0, 3)),
-    ],
-  );
 }

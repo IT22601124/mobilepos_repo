@@ -5,10 +5,7 @@ class CashierReportList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cashiers = [
-      ['Super Admin', 'Super Admin', 'LKR 20,142', 'LKR 0'],
-      ['Cashier 01', 'Cashier', 'LKR 9,936', 'LKR 5,936'],
-    ];
+    final cashiers = [];
 
     return Column(
       children: cashiers.map((item) {
