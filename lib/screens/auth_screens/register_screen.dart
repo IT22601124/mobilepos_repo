@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mpos/utils/custom_snackbar.dart';
 import 'package:mpos/main_widget/main_button.dart';
 import 'package:mpos/provider/auth_provider/auth_provider.dart';
 import 'package:mpos/utils/app_back_scope.dart';
@@ -47,9 +48,7 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
       );
       await authProvider.createAccount(user);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Account ready. Sign in to continue.')),
-      );
+      CustomSnackBar.success(context, 'Account ready. Sign in to continue.');
       context.go('/login');
     }
   }
@@ -108,7 +107,7 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
         centerTitle: true,
         automaticallyImplyLeading: false,
       ),
-      backgroundColor: color.background,
+      backgroundColor: color.surface,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),

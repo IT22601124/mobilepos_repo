@@ -8,15 +8,19 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final stock = (product['stock'] as num?)?.toInt() ?? 0;
     final lowStock = stock <= 5;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
+        color: theme.cardTheme.color ?? colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: isDark ? Border.all(color: colorScheme.outline.withValues(alpha: 0.1)) : null,
+        boxShadow: isDark ? [] : [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
@@ -28,7 +32,7 @@ class ProductCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
@@ -38,8 +42,8 @@ class ProductCard extends StatelessWidget {
                   width: 48,
                   decoration: BoxDecoration(
                     color: lowStock
-                        ? const Color(0xFFFEF3C7)
-                        : const Color(0xFFF3F4F6),
+                        ? (isDark ? const Color(0xFF78350F).withValues(alpha: 0.3) : const Color(0xFFFEF3C7))
+                        : (isDark ? colorScheme.surfaceContainerHighest : const Color(0xFFF1F5F9)),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -47,8 +51,8 @@ class ProductCard extends StatelessWidget {
                         ? Icons.warning_amber_rounded
                         : Icons.inventory_2_outlined,
                     color: lowStock
-                        ? const Color(0xFFD97706)
-                        : const Color(0xFF4B5563),
+                        ? (isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706))
+                        : (isDark ? colorScheme.primary : const Color(0xFF475569)),
                     size: 22,
                   ),
                 ),
@@ -59,7 +63,8 @@ class ProductCard extends StatelessWidget {
                     children: [
                       Text(
                         product['name'],
-                        style: const TextStyle(
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
                         ),
@@ -68,7 +73,7 @@ class ProductCard extends StatelessWidget {
                       Text(
                         '${product['sku']}  •  ${product['category']}',
                         style: TextStyle(
-                          color: Theme.of(context).hintColor,
+                          color: colorScheme.onSurface.withValues(alpha: 0.6),
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
                         ),
@@ -84,27 +89,27 @@ class ProductCard extends StatelessWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 15,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: colorScheme.primary,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
-                        vertical: 2,
+                        vertical: 3,
                       ),
                       decoration: BoxDecoration(
                         color: lowStock
-                            ? const Color(0xFFFEF3C7)
-                            : const Color(0xFFDCFCE7),
-                        borderRadius: BorderRadius.circular(6),
+                            ? (isDark ? const Color(0xFF78350F).withValues(alpha: 0.3) : const Color(0xFFFEF3C7))
+                            : (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFDCFCE7)),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         lowStock ? 'Low Stock: $stock' : 'Stock: $stock',
                         style: TextStyle(
                           color: lowStock
-                              ? const Color(0xFF92400E)
-                              : const Color(0xFF166534),
+                              ? (isDark ? const Color(0xFFFBBF24) : const Color(0xFF92400E))
+                              : (isDark ? const Color(0xFF10B981) : const Color(0xFF166534)),
                           fontSize: 10,
                           fontWeight: FontWeight.w900,
                         ),

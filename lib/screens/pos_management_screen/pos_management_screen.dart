@@ -1,3 +1,5 @@
+import 'package:mpos/provider/auth_provider/auth_provider.dart';
+import 'package:provider/provider.dart';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -5,10 +7,14 @@ import 'package:flutter/material.dart';
 import 'package:mpos/dio_client/dio_client.dart';
 import 'package:mpos/resources/api_routes.dart';
 import 'package:mpos/utils/app_back_scope.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 import 'widgets/management_header.dart';
 import 'widgets/management_option_card.dart';
 import 'widgets/management_tabs.dart';
+import 'package:mpos/utils/custom_snackbar.dart';
 
 const _statusOptions = [
   _FieldOption('true', 'Active'),
@@ -30,13 +36,16 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
   String? _error;
   List<Map<String, dynamic>> _records = [];
   Map<String, dynamic>? _reportPayload;
+  String _activeReportLabel = 'Summary';
+  String _activeReportEndpoint = ApiRoutes.reportSummary;
   Map<String, Map<String, dynamic>> _settingsPayloads = {};
   final Map<String, List<_LookupOption>> _lookupCache = {};
+  String _stockMovementSearch = '';
 
-  static const _green = Color(0xFF23C16B);
-  static const _blue = Color(0xFF2F80ED);
-  static const _yellow = Color(0xFFF59E0B);
-  static const _pink = Color(0xFFE056FD);
+  static const _green = Color(0xFF059669);
+  static const _blue = Color(0xFF2563EB);
+  static const _yellow = Color(0xFFD97706);
+  static const _pink = Color(0xFF7C3AED);
 
   @override
   void initState() {
@@ -52,6 +61,9 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
   }
 
   List<_ResourceConfig> _buildResources() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final isSuperAdmin = authProvider.isSuperAdmin;
+
     return [
       _ResourceConfig(
         tab: 'Products',
@@ -241,10 +253,16 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
             required: true,
           ),
           _FieldConfig(
-            'reference_id',
-            'Reference',
+            'stock_after',
+            'Stock after',
             keyboardType: TextInputType.number,
           ),
+          _FieldConfig(
+            'reference_id',
+            'Reference ID',
+            keyboardType: TextInputType.number,
+          ),
+          _FieldConfig('reference_no', 'Reference no'),
           _FieldConfig('remarks', 'Remarks'),
         ],
         sample: [],
@@ -494,10 +512,29 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         endpoint: ApiRoutes.authUsers,
         icon: Icons.verified_user_outlined,
         color: _blue,
-        fields: const [],
-        canCreate: false,
-        canEdit: false,
-        canDelete: false,
+        fields: const [
+          _FieldConfig('name', 'Full name', required: true),
+          _FieldConfig('phone', 'Phone', keyboardType: TextInputType.phone, required: true),
+          _FieldConfig('email', 'Email', keyboardType: TextInputType.emailAddress, required: true),
+          _FieldConfig('password', 'Password'),
+          _FieldConfig(
+            'role_id',
+            'Role',
+            keyboardType: TextInputType.number,
+            required: true,
+            lookupEndpoint: ApiRoutes.roles,
+          ),
+          _FieldConfig(
+            'branch_id',
+            'Branch',
+            keyboardType: TextInputType.number,
+            lookupEndpoint: ApiRoutes.branches,
+          ),
+          _FieldConfig('status', 'Status', options: _statusOptions),
+        ],
+        canCreate: isSuperAdmin,
+        canEdit: isSuperAdmin,
+        canDelete: isSuperAdmin,
         sample: [],
       ),
       _ResourceConfig(
@@ -572,7 +609,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         sample: [],
       ),
       _ResourceConfig.report(),
-      _ResourceConfig.settings(),
+      //_ResourceConfig.settings(),
     ];
   }
 
@@ -624,7 +661,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
 
     try {
       if (resource.kind == _ResourceKind.report) {
-        await _loadReport(ApiRoutes.reportSummary);
+        await _loadReport(ApiRoutes.reportSummary, label: 'Summary');
       } else {
         final response = await _dio.get(resource.endpoint);
         final rows = _extractRows(response.data);
@@ -683,26 +720,30 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     }
   }
 
-  Future<void> _loadReport(String endpoint) async {
+  Future<void> _loadReport(String endpoint, {required String label}) async {
     setState(() {
       _isLoading = true;
       _error = null;
       _reportPayload = null;
+      _activeReportLabel = label;
+      _activeReportEndpoint = endpoint;
     });
 
     try {
       final response = await _dio.get(
         endpoint,
         queryParameters: {
-          'start_date': null,
-          'end_date': null,
-          'branch_id': null,
-          'cashier_id': null,
-          'customer_id': null,
-          'product_id': null,
-          'category_id': null,
-          'payment_method': null,
+          'from': null,
+          'to': null,
           'status': null,
+          'customer_id': null,
+          'cashier_id': null,
+          'register_session_id': null,
+          'register_no': null,
+          'shift_no': null,
+          'sale_no': null,
+          'recent_limit': null,
+          'today_target': null,
         }..removeWhere((_, value) => value == null || value == ''),
       );
       setState(() => _reportPayload = _asMap(response.data));
@@ -713,12 +754,190 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           'message': 'Report API unavailable',
           'endpoint': endpoint,
           'common_query_params':
-              'start_date, end_date, branch_id, cashier_id, customer_id, product_id, category_id, payment_method, status',
+              'from, to, status, customer_id, cashier_id, register_session_id, register_no, shift_no, sale_no, recent_limit, today_target',
         };
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _downloadReportPdf() async {
+    final payload = _reportPayload;
+    if (payload == null) {
+      _showSnack('Load a report before downloading PDF', isError: true);
+      return;
+    }
+
+    final pdf = _buildReportPdf(
+      title: _activeReportLabel,
+      endpoint: _activeReportEndpoint,
+      payload: payload,
+    );
+    final filename =
+        '${_activeReportLabel.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-')}-report.pdf';
+
+    await Printing.sharePdf(bytes: await pdf.save(), filename: filename);
+  }
+
+  pw.Document _buildReportPdf({
+    required String title,
+    required String endpoint,
+    required Map<String, dynamic> payload,
+  }) {
+    final generatedAt = DateTime.now().toString().substring(0, 16);
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(28),
+        build: (context) {
+          return [
+            pw.Text(
+              'NOVA POS',
+              style: pw.TextStyle(
+                fontSize: 13,
+                color: PdfColors.blueGrey700,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              '$title Report',
+              style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              'Generated $generatedAt  |  /api/$endpoint',
+              style: const pw.TextStyle(
+                fontSize: 10,
+                color: PdfColors.blueGrey600,
+              ),
+            ),
+            pw.Divider(height: 24),
+            ...payload.entries
+                .take(40)
+                .map((entry) => _pdfReportEntry(entry.key, entry.value)),
+          ];
+        },
+      ),
+    );
+
+    return pdf;
+  }
+
+  pw.Widget _pdfReportEntry(String label, dynamic value) {
+    final title = _prettyLabel(label);
+
+    if (value is List) {
+      final rows = value.take(20).toList();
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          _pdfSectionTitle(title),
+          if (rows.isEmpty)
+            pw.Text('-', style: const pw.TextStyle(fontSize: 10))
+          else
+            ...rows.map((row) => _pdfRecordBox(row)),
+          pw.SizedBox(height: 10),
+        ],
+      );
+    }
+
+    if (value is Map) {
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          _pdfSectionTitle(title),
+          ...value.entries
+              .take(20)
+              .map(
+                (entry) => _pdfKeyValue(
+                  _prettyLabel(entry.key.toString()),
+                  _simpleDisplay(entry.value),
+                ),
+              ),
+          pw.SizedBox(height: 10),
+        ],
+      );
+    }
+
+    return pw.Column(
+      children: [
+        _pdfKeyValue(title, _simpleDisplay(value)),
+        pw.SizedBox(height: 5),
+      ],
+    );
+  }
+
+  pw.Widget _pdfRecordBox(dynamic value) {
+    if (value is! Map) {
+      return pw.Container(
+        width: double.infinity,
+        margin: const pw.EdgeInsets.only(bottom: 5),
+        padding: const pw.EdgeInsets.all(8),
+        color: PdfColors.blueGrey50,
+        child: pw.Text(
+          _simpleDisplay(value),
+          style: const pw.TextStyle(fontSize: 10),
+        ),
+      );
+    }
+
+    final map = Map<dynamic, dynamic>.from(value);
+    return pw.Container(
+      width: double.infinity,
+      margin: const pw.EdgeInsets.only(bottom: 5),
+      padding: const pw.EdgeInsets.all(8),
+      color: PdfColors.blueGrey50,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: map.entries
+            .take(6)
+            .map(
+              (entry) => _pdfKeyValue(
+                _prettyLabel(entry.key.toString()),
+                _simpleDisplay(entry.value),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  pw.Widget _pdfSectionTitle(String title) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 6),
+      child: pw.Text(
+        title,
+        style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
+      ),
+    );
+  }
+
+  pw.Widget _pdfKeyValue(String label, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 3),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.SizedBox(
+            width: 140,
+            child: pw.Text(
+              label,
+              style: const pw.TextStyle(
+                fontSize: 10,
+                color: PdfColors.blueGrey600,
+              ),
+            ),
+          ),
+          pw.Expanded(
+            child: pw.Text(value, style: const pw.TextStyle(fontSize: 10)),
+          ),
+        ],
+      ),
+    );
   }
 
   List<Map<String, dynamic>> _extractRows(dynamic payload) {
@@ -869,24 +1088,27 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Delete ${resource.tab}'),
-        content: Text('Delete ${_titleFor(record)}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
+      builder: (_) {
+        final theme = Theme.of(context);
+        return AlertDialog(
+          title: Text('Delete ${resource.tab}'),
+          content: Text('Delete ${_titleFor(record)}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
             ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.error,
+                foregroundColor: theme.colorScheme.onError,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
     );
 
     if (confirmed != true) return;
@@ -952,12 +1174,11 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
 
   void _showSnack(String message, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? const Color(0xFFEF4444) : _green,
-      ),
-    );
+    if (isError) {
+      CustomSnackBar.error(context, message);
+    } else {
+      CustomSnackBar.success(context, message);
+    }
   }
 
   Future<void> _editSettingsEndpoint(
@@ -965,6 +1186,222 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     String endpoint,
     Map<String, dynamic> payload,
   ) async {
+    if (title == 'Payment methods') {
+      final enabled = _enabledPaymentMethods(payload).toSet();
+      final edited = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Theme.of(context).cardColor,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+        ),
+        builder: (_) {
+          return StatefulBuilder(
+            builder: (context, setSheetState) {
+              return SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    18,
+                    16,
+                    18,
+                    MediaQuery.of(context).viewInsets.bottom + 16,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Payment methods',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '/$endpoint',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      ...['Cash', 'Card', 'Credit', 'Wallet'].map((method) {
+                        return SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(method),
+                          value: enabled.contains(method),
+                          onChanged: (value) {
+                            setSheetState(() {
+                              if (value) {
+                                enabled.add(method);
+                              } else {
+                                enabled.remove(method);
+                              }
+                            });
+                          },
+                        );
+                      }),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: enabled.isEmpty
+                              ? null
+                              : () => Navigator.pop(context, {
+                                  ...payload,
+                                  'enabled': enabled.toList(),
+                                  'enabled_methods': enabled
+                                      .map((value) => value.toLowerCase())
+                                      .toList(),
+                                }),
+                          icon: const Icon(Icons.save_outlined),
+                          label: const Text('Save payment methods'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+
+      if (edited != null) await _saveSettingsPayload(title, endpoint, edited);
+      return;
+    }
+
+    final fields = _settingsFields(title);
+    if (fields.isNotEmpty) {
+      final controllers = {
+        for (final field in fields)
+          if (field.type != _SettingFieldType.boolean)
+            field.key: TextEditingController(
+              text: _settingText(payload, field.key, field.fallback),
+            ),
+      };
+      final boolValues = {
+        for (final field in fields)
+          if (field.type == _SettingFieldType.boolean)
+            field.key: _settingBool(payload, field.key, field.boolFallback),
+      };
+
+      final edited = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Theme.of(context).cardColor,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+        ),
+        builder: (_) {
+          return StatefulBuilder(
+            builder: (context, setSheetState) {
+              return SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    18,
+                    16,
+                    18,
+                    MediaQuery.of(context).viewInsets.bottom + 16,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '/$endpoint',
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        ...fields.map((field) {
+                          if (field.type == _SettingFieldType.boolean) {
+                            return SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(field.label),
+                              value: boolValues[field.key] ?? false,
+                              onChanged: (value) => setSheetState(
+                                () => boolValues[field.key] = value,
+                              ),
+                            );
+                          }
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: TextField(
+                              controller: controllers[field.key],
+                              keyboardType:
+                                  field.type == _SettingFieldType.number
+                                  ? TextInputType.number
+                                  : TextInputType.text,
+                              decoration: InputDecoration(
+                                labelText: field.label,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              final next = Map<String, dynamic>.from(payload);
+                              for (final field in fields) {
+                                if (field.type == _SettingFieldType.boolean) {
+                                  next[field.key] =
+                                      boolValues[field.key] ?? false;
+                                  continue;
+                                }
+
+                                final text =
+                                    controllers[field.key]?.text.trim() ?? '';
+                                if (text.isEmpty) continue;
+                                next[field.key] =
+                                    field.type == _SettingFieldType.number
+                                    ? num.tryParse(text) ?? text
+                                    : text;
+                              }
+                              Navigator.pop(context, next);
+                            },
+                            icon: const Icon(Icons.save_outlined),
+                            label: Text('Save $title'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+
+      for (final controller in controllers.values) {
+        controller.dispose();
+      }
+
+      if (edited != null) await _saveSettingsPayload(title, endpoint, edited);
+      return;
+    }
+
     final controller = TextEditingController(
       text: const JsonEncoder.withIndent('  ').convert(payload),
     );
@@ -973,7 +1410,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
       isScrollControlled: true,
       backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),
       builder: (_) {
         return Padding(
@@ -1004,7 +1441,9 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
                     maxLines: null,
                     textAlignVertical: TextAlignVertical.top,
                     decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(6)),
+                      ),
                       alignLabelWithHint: true,
                       labelText: 'JSON payload',
                     ),
@@ -1028,12 +1467,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
                           Map<String, dynamic>.from(decoded),
                         );
                       } catch (error) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Invalid JSON: $error'),
-                            backgroundColor: const Color(0xFFEF4444),
-                          ),
-                        );
+                        CustomSnackBar.error(context, 'Invalid JSON: $error');
                       }
                     },
                     icon: const Icon(Icons.save_outlined),
@@ -1049,6 +1483,14 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     controller.dispose();
     if (edited == null) return;
 
+    await _saveSettingsPayload(title, endpoint, edited);
+  }
+
+  Future<void> _saveSettingsPayload(
+    String title,
+    String endpoint,
+    Map<String, dynamic> edited,
+  ) async {
     try {
       setState(() => _isLoading = true);
       await _dio.put(endpoint, data: edited);
@@ -1061,13 +1503,117 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     }
   }
 
+  List<String> _enabledPaymentMethods(Map<String, dynamic> payload) {
+    final value =
+        payload['enabled'] ??
+        payload['enabled_methods'] ??
+        payload['methods'] ??
+        payload['payment_methods'];
+    if (value is List) {
+      return value.map((item) => _titleCase(item.toString())).toList();
+    }
+    return const ['Cash', 'Card', 'Credit'];
+  }
+
+  List<_SettingFieldConfig> _settingsFields(String title) {
+    switch (title) {
+      case 'General':
+        return const [
+          _SettingFieldConfig('currency', 'Currency', fallback: 'LKR'),
+          _SettingFieldConfig(
+            'default_tax_percent',
+            'Default tax percent',
+            type: _SettingFieldType.number,
+          ),
+          _SettingFieldConfig(
+            'low_stock_alert_quantity',
+            'Low stock alert quantity',
+            type: _SettingFieldType.number,
+          ),
+          _SettingFieldConfig(
+            'allow_hold_sales',
+            'Allow hold sales',
+            type: _SettingFieldType.boolean,
+            boolFallback: true,
+          ),
+        ];
+      case 'Receipt':
+        return const [
+          _SettingFieldConfig('store_name', 'Store name'),
+          _SettingFieldConfig('receipt_title', 'Receipt title'),
+          _SettingFieldConfig('footer', 'Footer message'),
+          _SettingFieldConfig(
+            'show_tax',
+            'Show tax',
+            type: _SettingFieldType.boolean,
+            boolFallback: true,
+          ),
+          _SettingFieldConfig(
+            'show_discount',
+            'Show discount',
+            type: _SettingFieldType.boolean,
+            boolFallback: true,
+          ),
+          _SettingFieldConfig(
+            'show_logo',
+            'Show logo',
+            type: _SettingFieldType.boolean,
+          ),
+        ];
+      case 'Discount rules':
+        return const [
+          _SettingFieldConfig(
+            'allow_manual_discount',
+            'Allow manual discount',
+            type: _SettingFieldType.boolean,
+            boolFallback: true,
+          ),
+          _SettingFieldConfig(
+            'max_discount_percent',
+            'Max discount percent',
+            type: _SettingFieldType.number,
+          ),
+          _SettingFieldConfig(
+            'approval_required_above_percent',
+            'Approval required above percent',
+            type: _SettingFieldType.number,
+          ),
+        ];
+      default:
+        return const [];
+    }
+  }
+
+  String _settingText(
+    Map<String, dynamic> payload,
+    String key,
+    String fallback,
+  ) {
+    final value = payload[key];
+    if (value == null || value.toString().isEmpty) return fallback;
+    return value.toString();
+  }
+
+  bool _settingBool(
+    Map<String, dynamic> payload,
+    String key,
+    bool fallback,
+  ) {
+    final value = payload[key];
+    if (value is bool) return value;
+    if (value == null) return fallback;
+    return ['true', '1', 'yes', 'active', 'enabled'].contains(
+      value.toString().toLowerCase(),
+    );
+  }
+
   void _showDetails(_ResourceConfig resource, Map<String, dynamic> record) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),
       builder: (_) {
         return DraggableScrollableSheet(
@@ -1127,7 +1673,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
       isScrollControlled: true,
       backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),
       builder: (_) {
         return SafeArea(
@@ -1145,11 +1691,18 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
                     padding: const EdgeInsets.fromLTRB(18, 14, 8, 10),
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          backgroundColor: resource.color.withValues(
-                            alpha: 0.12,
+                        Container(
+                          height: 38,
+                          width: 38,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Icon(resource.icon, color: resource.color),
+                          child: Icon(
+                            resource.icon,
+                            color: resource.color,
+                            size: 21,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -1219,9 +1772,6 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
                     padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
                     decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,
-                      border: Border(
-                        top: BorderSide(color: Theme.of(context).dividerColor),
-                      ),
                     ),
                     child: SizedBox(
                       width: double.infinity,
@@ -1246,9 +1796,12 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
                         icon: const Icon(Icons.save_outlined),
                         label: Text(record == null ? 'Save' : 'Update'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: resource.color,
-                          foregroundColor: Colors.white,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                     ),
@@ -1462,6 +2015,57 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     return '#${_recordId(record) ?? '-'}';
   }
 
+  String _stockProductName(Map<String, dynamic> record) {
+    final direct = _firstValue(record, [
+      'product_name',
+      'product',
+      'name',
+      'item_name',
+    ]);
+    if (direct is Map) return _nestedName(direct);
+    if (direct != null) return _display(direct);
+
+    final product = record['product'];
+    if (product is Map) return _nestedName(product);
+
+    return 'Product #${_display(record['product_id'])}';
+  }
+
+  String _stockProductCode(Map<String, dynamic> record) {
+    final direct = _firstValue(record, [
+      'product_code',
+      'sku',
+      'barcode',
+      'code',
+    ]);
+    if (direct != null) return _display(direct);
+
+    final product = record['product'];
+    if (product is Map) {
+      final code = _firstValue(Map<String, dynamic>.from(product), [
+        'product_code',
+        'sku',
+        'barcode',
+        'code',
+      ]);
+      if (code != null) return _display(code);
+    }
+
+    return '-';
+  }
+
+  String _stockMovementType(Map<String, dynamic> record) {
+    return _display(
+      _firstValue(record, ['type', 'movement_type', 'method']),
+    ).toLowerCase();
+  }
+
+  String _stockReference(Map<String, dynamic> record) {
+    return _display(
+      _firstValue(record, ['reference_no', 'reference', 'reference_id']),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final resource = _activeResource;
@@ -1486,7 +2090,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
                 child: RefreshIndicator(
                   onRefresh: _loadActiveTab,
                   child: ListView(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
                     children: [
                       _SectionTitle(title: resource.tab),
                       const SizedBox(height: 12),
@@ -1518,6 +2122,9 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
   List<Widget> _buildSection(_ResourceConfig resource) {
     if (resource.kind == _ResourceKind.settings) return _settingsCards();
     if (resource.kind == _ResourceKind.report) return _reportCards();
+    if (resource.tab == 'Stock movements') {
+      return _stockMovementCards(resource);
+    }
 
     return [
       if (resource.canCreate) ...[
@@ -1528,9 +2135,9 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
             icon: const Icon(Icons.add),
             label: Text('Add ${resource.tab}'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: resource.color,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              padding: const EdgeInsets.symmetric(vertical: 13),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -1569,59 +2176,149 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     ];
   }
 
+  List<Widget> _stockMovementCards(_ResourceConfig resource) {
+    final query = _stockMovementSearch.trim().toLowerCase();
+    final filtered = query.isEmpty
+        ? _records
+        : _records.where((record) {
+            return [
+              _stockProductName(record),
+              _stockProductCode(record),
+              _stockMovementType(record),
+              _stockReference(record),
+              _display(record['remarks']),
+            ].any((value) => value.toLowerCase().contains(query));
+          }).toList();
+
+    return [
+      _StockMovementPanel(
+        records: filtered,
+        allRecords: _records,
+        endpoint: resource.endpoint,
+        searchText: _stockMovementSearch,
+        isLoading: _isLoading,
+        onSearchChanged: (value) {
+          setState(() => _stockMovementSearch = value);
+        },
+        onAdd: () => _showForm(resource),
+        onView: (record) => _showDetails(resource, record),
+        onEdit: resource.canEdit
+            ? (record) => _showForm(resource, record: record)
+            : null,
+        onDelete: resource.canDelete
+            ? (record) => _deleteRecord(resource, record)
+            : null,
+      ),
+      if (!_isLoading && _records.isEmpty)
+        const Padding(
+          padding: EdgeInsets.only(top: 12),
+          child: _EmptyCard(
+            title: 'No stock movements found',
+            subtitle: 'Use Add movement to record inventory in or out.',
+          ),
+        ),
+    ];
+  }
+
   List<Widget> _reportCards() {
     final reports = [
+      _ReportConfig(
+        'Dashboard',
+        ApiRoutes.dashboard,
+        Icons.space_dashboard_outlined,
+        'Metrics, chart, cashier summaries and recent sales',
+      ),
       _ReportConfig(
         'Summary',
         ApiRoutes.reportSummary,
         Icons.dashboard_outlined,
+        'Today at a glance',
       ),
-      _ReportConfig('Sales', ApiRoutes.reportSales, Icons.receipt_long),
-      _ReportConfig('Cashiers', ApiRoutes.reportCashiers, Icons.badge_outlined),
+      _ReportConfig(
+        'Sales',
+        ApiRoutes.reportSales,
+        Icons.receipt_long,
+        'Bills, totals and sale status',
+      ),
+      _ReportConfig(
+        'Cashiers',
+        ApiRoutes.reportCashiers,
+        Icons.badge_outlined,
+        'Performance by cashier',
+      ),
       _ReportConfig(
         'Products',
         ApiRoutes.reportProducts,
         Icons.inventory_2_outlined,
+        'Product movement and value',
       ),
-      _ReportConfig('Items', ApiRoutes.reportItems, Icons.list_alt_outlined),
+      _ReportConfig(
+        'Items',
+        ApiRoutes.reportItems,
+        Icons.list_alt_outlined,
+        'Line items sold',
+      ),
       _ReportConfig(
         'Inventory',
         ApiRoutes.reportInventory,
         Icons.warehouse_outlined,
+        'Stock position and alerts',
       ),
       _ReportConfig(
         'Payments',
         ApiRoutes.reportPayments,
         Icons.payments_outlined,
+        'Cash, card and other payments',
       ),
       _ReportConfig(
         'Tax discounts',
         ApiRoutes.reportTaxDiscounts,
         Icons.percent,
+        'Taxes, discounts and adjustments',
       ),
       _ReportConfig(
         'Credit',
         ApiRoutes.reportCredit,
         Icons.account_balance_wallet_outlined,
+        'Customer credit and balances',
       ),
     ];
 
     return [
       _QueryHintCard(),
-      const SizedBox(height: 10),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: reports.map((report) {
-          return ActionChip(
-            avatar: Icon(report.icon, size: 18, color: _blue),
-            label: Text(report.label),
-            onPressed: () => _loadReport(report.endpoint),
+      const SizedBox(height: 12),
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 520;
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: reports.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: compact ? 1 : 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: compact ? 3.25 : 2.8,
+            ),
+            itemBuilder: (context, index) {
+              final report = reports[index];
+              return _ReportPickerCard(
+                report: report,
+                selected: report.endpoint == _activeReportEndpoint,
+                onTap: () => _loadReport(report.endpoint, label: report.label),
+              );
+            },
           );
-        }).toList(),
+        },
       ),
       const SizedBox(height: 12),
-      if (_reportPayload != null) _ReportPayloadCard(payload: _reportPayload!),
+      if (_reportPayload != null)
+        _ReportPayloadCard(
+          title: _activeReportLabel,
+          endpoint: _activeReportEndpoint,
+          payload: _reportPayload!,
+          onDownload: () => _downloadReportPdf(),
+        ),
     ];
   }
 
@@ -1771,8 +2468,9 @@ class _ReportConfig {
   final String label;
   final String endpoint;
   final IconData icon;
+  final String description;
 
-  const _ReportConfig(this.label, this.endpoint, this.icon);
+  const _ReportConfig(this.label, this.endpoint, this.icon, this.description);
 }
 
 class _SettingsEndpointConfig {
@@ -1783,6 +2481,24 @@ class _SettingsEndpointConfig {
   const _SettingsEndpointConfig(this.title, this.endpoint, this.icon);
 }
 
+enum _SettingFieldType { text, number, boolean }
+
+class _SettingFieldConfig {
+  final String key;
+  final String label;
+  final _SettingFieldType type;
+  final String fallback;
+  final bool boolFallback;
+
+  const _SettingFieldConfig(
+    this.key,
+    this.label, {
+    this.type = _SettingFieldType.text,
+    this.fallback = '',
+    this.boolFallback = false,
+  });
+}
+
 class _SectionTitle extends StatelessWidget {
   final String title;
 
@@ -1790,12 +2506,13 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w900,
-        color: Color(0xFF111827),
+        color: theme.colorScheme.onSurface,
       ),
     );
   }
@@ -1808,24 +2525,27 @@ class _ApiNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
+        color: isDark ? const Color(0xFF78350F).withValues(alpha: 0.2) : const Color(0xFFFFFBEB),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFDE68A)),
+        border: Border.all(color: isDark ? const Color(0xFF92400E).withValues(alpha: 0.4) : const Color(0xFFFDE68A)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 20),
+          Icon(Icons.info_outline, color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFF59E0B), size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
-                color: Color(0xFF92400E),
+              style: TextStyle(
+                color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
@@ -1845,6 +2565,494 @@ class _LoadingCard extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.symmetric(vertical: 18),
       child: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _StockMovementPanel extends StatelessWidget {
+  final List<Map<String, dynamic>> records;
+  final List<Map<String, dynamic>> allRecords;
+  final String endpoint;
+  final String searchText;
+  final bool isLoading;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onAdd;
+  final ValueChanged<Map<String, dynamic>> onView;
+  final ValueChanged<Map<String, dynamic>>? onEdit;
+  final ValueChanged<Map<String, dynamic>>? onDelete;
+
+  const _StockMovementPanel({
+    required this.records,
+    required this.allRecords,
+    required this.endpoint,
+    required this.searchText,
+    required this.isLoading,
+    required this.onSearchChanged,
+    required this.onAdd,
+    required this.onView,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final stockIn = allRecords
+        .where((record) => _isStockIn(_movementType(record)))
+        .fold<double>(0, (sum, record) => sum + _quantity(record).abs());
+    final stockOut = allRecords
+        .where((record) => _isStockOut(_movementType(record)))
+        .fold<double>(0, (sum, record) => sum + _quantity(record).abs());
+    final adjustments = allRecords
+        .where((record) => _movementType(record).contains('adjust'))
+        .length;
+    final productCount = allRecords
+        .map(_productIdentity)
+        .where((value) => value.isNotEmpty && value != '-')
+        .toSet()
+        .length;
+
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color ?? theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: isDark ? 0.1 : 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Stock movements',
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurface,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Record inventory in, sales out, returns, and stock corrections.',
+                      style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: onAdd,
+                icon: const Icon(Icons.swap_vert, size: 18),
+                label: const Text('Add movement'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          const Wrap(
+            spacing: 24,
+            runSpacing: 10,
+            children: [
+              _StockPanelLink(icon: Icons.history, label: 'Movement history'),
+              _StockPanelLink(
+                icon: Icons.inventory_2_outlined,
+                label: 'Remaining stock',
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          Wrap(
+            spacing: 64,
+            runSpacing: 18,
+            children: [
+              _StockMetric(
+                label: 'Movements',
+                value: allRecords.length.toString(),
+              ),
+              _StockMetric(
+                label: 'Stock in',
+                value: '+${_formatNumber(stockIn)}',
+              ),
+              _StockMetric(
+                label: 'Stock out',
+                value: '-${_formatNumber(stockOut)}',
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          Wrap(
+            spacing: 24,
+            runSpacing: 8,
+            children: [
+              _StockInlineStat(
+                label: 'Adjustments',
+                value: adjustments.toString(),
+              ),
+              _StockInlineStat(label: 'Endpoint', value: '/$endpoint'),
+              _StockInlineStat(
+                label: 'Products tracked',
+                value: productCount.toString(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          TextField(
+            onChanged: onSearchChanged,
+            style: const TextStyle(color: Color(0xFF0F172A)),
+            decoration: InputDecoration(
+              hintText: 'Search product, SKU, type, reference, or remarks',
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+              prefixIcon: const Icon(Icons.search, color: Color(0xFF2563EB)),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: const BorderSide(color: Color(0xFF2563EB)),
+              ),
+            ),
+            controller: TextEditingController(text: searchText)
+              ..selection = TextSelection.collapsed(offset: searchText.length),
+          ),
+          const SizedBox(height: 14),
+          if (isLoading)
+            const LinearProgressIndicator()
+          else
+            _StockMovementTable(
+              records: records,
+              onView: onView,
+              onEdit: onEdit,
+              onDelete: onDelete,
+            ),
+        ],
+      ),
+    );
+  }
+
+  static bool _isStockIn(String type) {
+    return type.contains('purchase') ||
+        type.contains('return') ||
+        type.contains('in');
+  }
+
+  static bool _isStockOut(String type) {
+    return type.contains('sale') ||
+        type.contains('out') ||
+        type.contains('damage') ||
+        type.contains('loss');
+  }
+
+  static String _formatNumber(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(2);
+  }
+}
+
+class _StockMetric extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _StockMetric({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      width: 160,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: theme.colorScheme.onSurface,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              color: theme.colorScheme.onSurface,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StockInlineStat extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _StockInlineStat({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Text.rich(
+      TextSpan(
+        text: '$label: ',
+        style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
+        children: [
+          TextSpan(
+            text: value,
+            style: TextStyle(
+              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StockPanelLink extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _StockPanelLink({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: theme.colorScheme.primary, size: 14),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            color: theme.colorScheme.onSurface,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StockMovementTable extends StatelessWidget {
+  final List<Map<String, dynamic>> records;
+  final ValueChanged<Map<String, dynamic>> onView;
+  final ValueChanged<Map<String, dynamic>>? onEdit;
+  final ValueChanged<Map<String, dynamic>>? onDelete;
+
+  const _StockMovementTable({
+    required this.records,
+    required this.onView,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (records.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: const Text(
+          'No movements match the current search.',
+          style: TextStyle(
+            color: Color(0xFF64748B),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          showCheckboxColumn: false,
+          headingRowColor: WidgetStateProperty.all(isDark ? theme.colorScheme.surfaceContainerHighest : const Color(0xFF102516)),
+          dataRowColor: WidgetStateProperty.all(theme.cardTheme.color ?? theme.colorScheme.surface),
+          headingTextStyle: TextStyle(
+            color: isDark ? theme.colorScheme.onSurface : Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          ),
+          dataTextStyle: TextStyle(
+            color: theme.colorScheme.onSurface,
+            fontSize: 12,
+          ),
+          columnSpacing: 36,
+          columns: const [
+            DataColumn(label: Text('DATE')),
+            DataColumn(label: Text('PRODUCT')),
+            DataColumn(label: Text('TYPE')),
+            DataColumn(label: Text('QUANTITY')),
+            DataColumn(label: Text('STOCK AFTER')),
+            DataColumn(label: Text('REFERENCE')),
+            DataColumn(label: Text('REMARKS')),
+            DataColumn(label: Text('')),
+          ],
+          rows: records.map((record) {
+            final type = _movementType(record);
+            return DataRow(
+              onSelectChanged: (_) => onView(record),
+              cells: [
+                DataCell(Text(_movementDate(record))),
+                DataCell(
+                  SizedBox(
+                    width: 220,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _productName(record),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _productCode(record),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                DataCell(_MovementTypeChip(type: type)),
+                DataCell(
+                  Text(
+                    _formatSignedQuantity(record),
+                    style: TextStyle(
+                      color: _quantityColor(context, type),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                DataCell(Text(_display(_firstValue(record, ['stock_after'])))),
+                DataCell(Text(_reference(record))),
+                DataCell(
+                  SizedBox(
+                    width: 260,
+                    child: Text(
+                      _display(record['remarks']),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                DataCell(
+                  Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'View movement',
+                        onPressed: () => onView(record),
+                        icon: const Icon(
+                          Icons.visibility_outlined,
+                          color: Color(0xFF2563EB),
+                          size: 18,
+                        ),
+                      ),
+                      if (onEdit != null)
+                        IconButton(
+                          tooltip: 'Edit movement',
+                          onPressed: () => onEdit!(record),
+                          icon: const Icon(
+                            Icons.edit_outlined,
+                            color: Color(0xFF334155),
+                            size: 18,
+                          ),
+                        ),
+                      if (onDelete != null)
+                        IconButton(
+                          tooltip: 'Delete movement',
+                          onPressed: () => onDelete!(record),
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Color(0xFFFCA5A5),
+                            size: 18,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+class _MovementTypeChip extends StatelessWidget {
+  final String type;
+
+  const _MovementTypeChip({required this.type});
+
+  @override
+  Widget build(BuildContext context) {
+    final stockIn = _StockMovementPanel._isStockIn(type);
+    final color = stockIn ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
+      ),
+      child: Text(
+        _titleCase(type),
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
     );
   }
 }
@@ -1898,17 +3106,26 @@ class _ResourceActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       decoration: _cardDecoration(context),
       child: Column(
         children: [
           Row(
             children: [
-              CircleAvatar(
-                backgroundColor: const Color(0xFFEFF6FF),
-                child: Icon(icon, color: const Color(0xFF2F80ED)),
+              Container(
+                height: 36,
+                width: 36,
+                decoration: BoxDecoration(
+                  color: isDark ? colorScheme.surface : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: isDark ? colorScheme.primary : const Color(0xFF334155), size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1917,13 +3134,16 @@ class _ResourceActionCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(fontWeight: FontWeight.w900),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.onSurface,
+                      ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: Color(0xFF6B7280),
+                      style: TextStyle(
+                        color: colorScheme.onSurface.withValues(alpha: 0.6),
                         fontSize: 12,
                       ),
                     ),
@@ -1932,11 +3152,14 @@ class _ResourceActionCard extends StatelessWidget {
               ),
               Text(
                 trailing,
-                style: const TextStyle(fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: colorScheme.onSurface,
+                ),
               ),
             ],
           ),
-          const Divider(height: 22),
+          const Divider(height: 18),
           Row(
             children: [
               Expanded(
@@ -1944,6 +3167,7 @@ class _ResourceActionCard extends StatelessWidget {
                   onPressed: onView,
                   icon: const Icon(Icons.visibility_outlined, size: 18),
                   label: const Text('View'),
+                  style: _rowButtonStyle(context),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1952,6 +3176,7 @@ class _ResourceActionCard extends StatelessWidget {
                   onPressed: onEdit,
                   icon: const Icon(Icons.edit_outlined, size: 18),
                   label: const Text('Edit'),
+                  style: _rowButtonStyle(context),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1962,10 +3187,15 @@ class _ResourceActionCard extends StatelessWidget {
                   label: const Text('Delete'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFEF4444),
+                    side: BorderSide.none,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
                   ),
                 ),
               ),
-              if (extraAction != null) extraAction!,
+              ?extraAction,
             ],
           ),
         ],
@@ -1977,21 +3207,141 @@ class _ResourceActionCard extends StatelessWidget {
 class _QueryHintCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: _cardDecoration(context),
-      child: const Text(
-        'Common report filters: start_date, end_date, branch_id, cashier_id, customer_id, product_id, category_id, payment_method, status.',
-        style: TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w700),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.insights_outlined, color: theme.colorScheme.primary, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Choose a report to review',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Tap a report card below. Filters such as date range, branch, cashier, customer, product, category, payment method and status can be sent by the API.',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReportPickerCard extends StatelessWidget {
+  final _ReportConfig report;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ReportPickerCard({
+    required this.report,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Material(
+      color: selected
+          ? (isDark ? colorScheme.primary.withValues(alpha: 0.2) : const Color(0xFFDBEAFE))
+          : (isDark ? colorScheme.surfaceContainerHighest : const Color(0xFFEAF1FB)),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(13),
+          child: Row(
+            children: [
+              Container(
+                height: 40,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: isDark ? colorScheme.surface : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(report.icon, color: colorScheme.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      report.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      report.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontSize: 12,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                selected ? Icons.check_circle : Icons.chevron_right,
+                color: selected
+                    ? colorScheme.primary
+                    : colorScheme.onSurface.withValues(alpha: 0.4),
+                size: 20,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
 class _ReportPayloadCard extends StatelessWidget {
+  final String title;
+  final String endpoint;
   final Map<String, dynamic> payload;
+  final VoidCallback onDownload;
 
-  const _ReportPayloadCard({required this.payload});
+  const _ReportPayloadCard({
+    required this.title,
+    required this.endpoint,
+    required this.payload,
+    required this.onDownload,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2002,9 +3352,34 @@ class _ReportPayloadCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Report result',
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+          Row(
+            children: [
+              const Icon(Icons.summarize_outlined, color: Color(0xFF2563EB)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$title report',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Download PDF',
+                onPressed: onDownload,
+                icon: const Icon(Icons.picture_as_pdf_outlined),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            endpoint,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
           ),
           const SizedBox(height: 10),
           ...entries.map(
@@ -2024,6 +3399,7 @@ class _ReportEntry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     if (value is List) {
       final rows = (value as List).take(8).toList();
       return Padding(
@@ -2033,14 +3409,14 @@ class _ReportEntry extends StatelessWidget {
           children: [
             Text(
               _prettyLabel(label),
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF111827),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
             if (rows.isEmpty)
-              const Text('-', style: TextStyle(color: Color(0xFF6B7280)))
+              Text('-', style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)))
             else
               ...rows.map((row) => _ReportListRow(value: row)),
           ],
@@ -2056,9 +3432,9 @@ class _ReportEntry extends StatelessWidget {
           children: [
             Text(
               _prettyLabel(label),
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF111827),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 6),
@@ -2127,26 +3503,29 @@ class _SmallReportTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
+        color: theme.cardTheme.color ?? theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: isDark ? 0.1 : 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
           if (subtitle != null && subtitle!.isNotEmpty) ...[
             const SizedBox(height: 3),
             Text(
               subtitle!,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+              style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
             ),
           ],
         ],
@@ -2185,9 +3564,14 @@ class _SettingsApiCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                backgroundColor: const Color(0xFFEFF6FF),
-                child: Icon(icon, color: const Color(0xFF2F80ED)),
+              Container(
+                height: 36,
+                width: 36,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -2196,13 +3580,13 @@ class _SettingsApiCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(fontWeight: FontWeight.w900),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       endpoint,
-                      style: const TextStyle(
-                        color: Color(0xFF6B7280),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         fontSize: 12,
                       ),
                     ),
@@ -2221,16 +3605,16 @@ class _SettingsApiCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFF9FAFB),
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
+              border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1)),
             ),
             child: Text(
               preview,
               maxLines: 6,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF374151),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 12,
                 fontFamily: 'monospace',
               ),
@@ -2263,9 +3647,14 @@ class _SettingsTile extends StatelessWidget {
       decoration: _cardDecoration(context),
       child: Row(
         children: [
-          CircleAvatar(
-            backgroundColor: const Color(0xFFEFF6FF),
-            child: Icon(icon, color: const Color(0xFF2F80ED)),
+          Container(
+            height: 36,
+            width: 36,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -2274,13 +3663,13 @@ class _SettingsTile extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    color: Color(0xFF6B7280),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -2359,7 +3748,7 @@ class _FormInput extends StatelessWidget {
           isExpanded: true,
           decoration: InputDecoration(
             labelText: required ? '$label *' : label,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
           ),
           items: menuOptions
               .map(
@@ -2383,7 +3772,7 @@ class _FormInput extends StatelessWidget {
         keyboardType: keyboardType,
         decoration: InputDecoration(
           labelText: required ? '$label *' : label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
         ),
       ),
     );
@@ -2402,8 +3791,7 @@ class _FormHintCard extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFEFF6FF),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFBFDBFE)),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2426,11 +3814,171 @@ class _FormHintCard extends StatelessWidget {
   }
 }
 
+dynamic _firstValue(Map<String, dynamic> record, List<String> keys) {
+  for (final key in keys) {
+    final value = record[key];
+    if (value != null && value.toString().isNotEmpty) return value;
+  }
+  return null;
+}
+
+String _display(dynamic value) {
+  if (value == null) return '-';
+  if (value is bool) return value ? 'Active' : 'Inactive';
+  if (value is Map) {
+    return _display(
+      _firstValue(Map<String, dynamic>.from(value), [
+        'name',
+        'sale_no',
+        'product_code',
+        'sku',
+        'phone',
+        'email',
+        'id',
+      ]),
+    );
+  }
+  if (value is List) return '${value.length} items';
+  return value.toString();
+}
+
+String _movementType(Map<String, dynamic> record) {
+  return _display(
+    _firstValue(record, ['type', 'movement_type', 'method']),
+  ).toLowerCase();
+}
+
+double _quantity(Map<String, dynamic> record) {
+  final value = _firstValue(record, ['quantity', 'qty', 'stock_quantity']);
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+String _productName(Map<String, dynamic> record) {
+  final direct = _firstValue(record, [
+    'product_name',
+    'product',
+    'name',
+    'item_name',
+  ]);
+  if (direct != null) return _display(direct);
+  return 'Product #${_display(record['product_id'])}';
+}
+
+String _productCode(Map<String, dynamic> record) {
+  final direct = _firstValue(record, [
+    'product_code',
+    'sku',
+    'barcode',
+    'code',
+  ]);
+  if (direct != null) return _display(direct);
+
+  final product = record['product'];
+  if (product is Map) {
+    return _display(
+      _firstValue(Map<String, dynamic>.from(product), [
+        'product_code',
+        'sku',
+        'barcode',
+        'code',
+      ]),
+    );
+  }
+
+  return '-';
+}
+
+String _productIdentity(Map<String, dynamic> record) {
+  return _display(
+    _firstValue(record, ['product_id', 'product_code', 'sku']) ??
+        _productName(record),
+  );
+}
+
+String _reference(Map<String, dynamic> record) {
+  final value = _firstValue(record, [
+    'reference_no',
+    'reference',
+    'reference_id',
+    'sale_no',
+  ]);
+  final text = _display(value);
+  return text == '-' ? '-' : '#$text';
+}
+
+String _movementDate(Map<String, dynamic> record) {
+  final value = _firstValue(record, [
+    'created_at',
+    'date',
+    'movement_date',
+    'updated_at',
+  ]);
+  final parsed = DateTime.tryParse(value?.toString() ?? '');
+  if (parsed == null) return _display(value);
+
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${months[parsed.month - 1]} ${parsed.day}, ${parsed.year}';
+}
+
+String _formatSignedQuantity(Map<String, dynamic> record) {
+  final type = _movementType(record);
+  final amount = _quantity(record).abs();
+  final text = _StockMovementPanel._formatNumber(amount);
+  if (_StockMovementPanel._isStockOut(type)) return '-$text';
+  if (_StockMovementPanel._isStockIn(type)) return '+$text';
+  return _StockMovementPanel._formatNumber(_quantity(record));
+}
+
+Color _quantityColor(BuildContext context, String type) {
+  final theme = Theme.of(context);
+  if (_StockMovementPanel._isStockIn(type)) return const Color(0xFF10B981);
+  if (_StockMovementPanel._isStockOut(type)) return const Color(0xFFF87171);
+  return theme.colorScheme.onSurface;
+}
+
+String _titleCase(String value) {
+  return value
+      .replaceAll('_', ' ')
+      .split(' ')
+      .where((word) => word.isNotEmpty)
+      .map((word) => '${word[0].toUpperCase()}${word.substring(1)}')
+      .join(' ');
+}
+
 BoxDecoration _cardDecoration(BuildContext context) {
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
   return BoxDecoration(
-    color: Theme.of(context).cardColor,
+    color: isDark ? theme.colorScheme.surfaceContainerHighest : const Color(0xFFEAF1FB),
     borderRadius: BorderRadius.circular(8),
-    border: Border.all(color: Theme.of(context).dividerColor),
+    border: isDark ? Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.1)) : null,
+  );
+}
+
+ButtonStyle _rowButtonStyle(BuildContext context) {
+  final theme = Theme.of(context);
+  final colorScheme = theme.colorScheme;
+  return OutlinedButton.styleFrom(
+    foregroundColor: colorScheme.onSurface,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    padding: const EdgeInsets.symmetric(vertical: 11),
+    backgroundColor: colorScheme.surface,
+    disabledBackgroundColor: colorScheme.surface.withValues(alpha: 0.5),
+    side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
   );
 }
 

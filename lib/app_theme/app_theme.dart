@@ -37,14 +37,24 @@ class AppThemes {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: const BorderSide(color: primaryBlue, width: 1.4),
+      ),
     ),
     cardTheme: CardThemeData(
-      color: Colors.white,
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-      ),
+      color: const Color(0xFFEAF1FB),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
     ),
   );
 
@@ -53,34 +63,52 @@ class AppThemes {
     useMaterial3: true,
     brightness: Brightness.dark,
     colorScheme: const ColorScheme.dark(
-      primary: Color(0xFF3B82F6), // Slightly lighter blue for dark contrast
+      primary: Color(0xFF60A5FA), // Lighter blue for better visibility in dark
       secondary: secondaryGreen,
-      surface: Color(0xFF131A26),
+      surface: Color(0xFF0F172A), // Darker surface
+      surfaceContainerHighest: Color(0xFF1E293B), // For cards and elevations
       inversePrimary: inversePrimaryDark,
-      error: Color(0xFFEF4444),
+      error: Color(0xFFF87171),
       onPrimary: Colors.white,
       onSecondary: Colors.white,
-      onSurface: Color(0xFFF8FAFC),
+      onSurface: Color(0xFFF1F5F9), // Slate 100 for better readability
+      outline: Color(0xFF334155), // Slate 700 for borders
     ),
-    scaffoldBackgroundColor: const Color(0xFF0B0F19),
+    scaffoldBackgroundColor: const Color(0xFF020617), // Rich black
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF131A26),
-      foregroundColor: Color(0xFFF8FAFC),
+      backgroundColor: Color(0xFF0F172A),
+      foregroundColor: Color(0xFFF1F5F9),
       elevation: 0,
       centerTitle: false,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFF0F172A),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      fillColor: const Color(0xFF1E293B),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFF334155)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFF334155)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFF60A5FA), width: 1.4),
+      ),
     ),
     cardTheme: CardThemeData(
-      color: const Color(0xFF131A26),
+      color: const Color(0xFF0F172A),
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
         side: const BorderSide(color: Color(0xFF1E293B)),
       ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
   );
 }

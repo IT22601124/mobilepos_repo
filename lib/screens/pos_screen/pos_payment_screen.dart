@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mpos/utils/custom_snackbar.dart';
 import 'package:mpos/dio_client/dio_client.dart';
 import 'package:mpos/resources/api_routes.dart';
 import 'package:mpos/utils/app_back_scope.dart';
@@ -69,7 +70,7 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
 
   double get creditAmount {
     if (paymentMethod != 'Credit') return 0;
-    return widget.total - amountPaid;
+    return (widget.total - amountPaid).clamp(0, widget.total).toDouble();
   }
 
   Map<String, dynamic> get customer {
@@ -80,8 +81,15 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
   }
 
   double get availableCredit {
-    return (customer['creditLimit'] as double) -
-        (customer['balance'] as double);
+    final limit = _toDouble(customer['creditLimit']);
+    final balance = _toDouble(customer['balance']);
+    return (limit - balance).clamp(0, double.infinity).toDouble();
+  }
+
+  bool get hasSelectedCreditCustomer {
+    return customer['id'] != null &&
+        customer['status'] == true &&
+        selectedCustomer != 'Walk-in customer';
   }
 
   bool get canComplete {
@@ -92,8 +100,7 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
     }
 
     if (paymentMethod == 'Credit') {
-      return customer['status'] == true &&
-          selectedCustomer != 'Walk-in customer' &&
+      return hasSelectedCreditCustomer &&
           creditAmount > 0 &&
           availableCredit >= creditAmount;
     }
@@ -132,12 +139,34 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
       final customers = _extractRows(response.data)
           .map(
             (item) => {
-              'id': item['id'],
-              'name': item['name']?.toString() ?? 'Customer',
-              'phone': item['phone']?.toString() ?? '-',
-              'creditLimit': _toDouble(item['credit_limit']),
-              'balance': _toDouble(item['current_balance']),
-              'status': _asBool(item['status']),
+              'id': item['id'] ?? item['customer_id'],
+              'name':
+                  (item['name'] ??
+                          item['customer_name'] ??
+                          item['full_name'] ??
+                          item['display_name'])
+                      ?.toString() ??
+                  'Customer',
+              'phone':
+                  (item['phone'] ?? item['mobile'] ?? item['contact'])
+                      ?.toString() ??
+                  '-',
+              'creditLimit': _toDouble(
+                item['credit_limit'] ?? item['creditLimit'] ?? item['limit'],
+              ),
+              'balance': _toDouble(
+                item['current_balance'] ??
+                    item['balance'] ??
+                    item['credit_balance'] ??
+                    item['outstanding_balance'],
+              ),
+              'status': _asBool(
+                item['status'] ??
+                    item['is_active'] ??
+                    item['active'] ??
+                    item['enabled'],
+                fallback: true,
+              ),
             },
           )
           .where((item) => item['name'] != 'Customer')
@@ -160,6 +189,11 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
             (item) => item['name'] == selectedCustomer,
           )) {
             selectedCustomer = 'Walk-in customer';
+          }
+          if (paymentMethod == 'Credit' ||
+              selectedCustomer == 'Walk-in customer') {
+            selectedCustomer =
+                _firstEligibleCreditCustomer() ?? selectedCustomer;
           }
         });
       }
@@ -207,12 +241,7 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_messageFor(error)),
-          backgroundColor: const Color(0xFFEF4444),
-        ),
-      );
+      CustomSnackBar.error(context, _messageFor(error));
     } finally {
       if (mounted) setState(() => isSubmitting = false);
     }
@@ -237,12 +266,15 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
 
     return {
       'customer_id': paymentMethod == 'Credit' ? customer['id'] : null,
+      'payment_method': backendMethod,
       'subtotal': widget.subtotal,
       'discount_total': widget.discount,
       'tax_total': widget.tax,
       'grand_total': widget.total,
       'paid_amount': amountPaid,
       'balance_amount': paymentMethod == 'Credit' ? creditAmount : 0,
+      'credit_amount': paymentMethod == 'Credit' ? creditAmount : 0,
+      'due_days': paymentMethod == 'Credit' ? dueDays : null,
       'status': 'completed',
       'notes': paymentMethod == 'Credit' ? 'Due in $dueDays days' : null,
       'items': items,
@@ -324,6 +356,10 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
               .map((item) => Map<String, dynamic>.from(item))
               .toList();
         }
+        if (value is Map) {
+          final nestedRows = _extractRows(value);
+          if (nestedRows.isNotEmpty) return nestedRows;
+        }
       }
     }
     return [];
@@ -335,14 +371,16 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
     return {};
   }
 
-  bool _asBool(dynamic value) {
+  bool _asBool(dynamic value, {bool fallback = false}) {
     if (value is bool) return value;
+    if (value == null) return fallback;
     return [
       'true',
       '1',
       'active',
       'yes',
-    ].contains(value?.toString().toLowerCase());
+      'enabled',
+    ].contains(value.toString().toLowerCase());
   }
 
   double _toDouble(dynamic value) {
@@ -359,6 +397,19 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
       return 'Could not reach backend. Sale was not saved.';
     }
     return text;
+  }
+
+  String? _firstEligibleCreditCustomer() {
+    for (final item in creditCustomers) {
+      final limit = _toDouble(item['creditLimit']);
+      final balance = _toDouble(item['balance']);
+      if (item['id'] != null &&
+          item['status'] == true &&
+          limit - balance >= creditAmount) {
+        return item['name']?.toString();
+      }
+    }
+    return null;
   }
 
   void _goBack() {
@@ -470,8 +521,8 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
                               : widget.cart.isEmpty
                               ? 'Add at least one item to complete payment.'
                               : '',
-                          style: const TextStyle(
-                            color: Color(0xFFEF4444),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -505,15 +556,18 @@ class _TotalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: _cardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Amount to Pay',
-            style: TextStyle(color: Color(0xFF6B7280)),
+            style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.6)),
           ),
           const SizedBox(height: 6),
           Text(
@@ -521,7 +575,7 @@ class _TotalCard extends StatelessWidget {
             style: const TextStyle(
               fontSize: 34,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF23C16B),
+              color: Color(0xFF10B981),
             ),
           ),
         ],
@@ -813,8 +867,8 @@ class _Keypad extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: const [
+        color: Theme.of(context).colorScheme.surface,
+        boxShadow: Theme.of(context).brightness == Brightness.dark ? [] : const [
           BoxShadow(
             color: Color(0x1A000000),
             blurRadius: 18,
@@ -891,9 +945,10 @@ class _Keypad extends StatelessWidget {
                     : const Icon(Icons.receipt_long),
                 label: Text(buttonText),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF23C16B),
+                  backgroundColor: const Color(0xFF10B981),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ),
@@ -905,11 +960,13 @@ class _Keypad extends StatelessWidget {
 }
 
 BoxDecoration _cardDecoration(BuildContext context) {
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
   return BoxDecoration(
-    color: Theme.of(context).cardColor,
+    color: theme.cardTheme.color ?? theme.colorScheme.surface,
     borderRadius: BorderRadius.circular(14),
-    border: Border.all(color: Theme.of(context).dividerColor),
-    boxShadow: const [
+    border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.1)),
+    boxShadow: isDark ? [] : const [
       BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, 4)),
     ],
   );

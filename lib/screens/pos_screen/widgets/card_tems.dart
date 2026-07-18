@@ -16,14 +16,18 @@ class CartItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final lineTotal = item['price'] * item['qty'];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
+        color: theme.cardTheme.color ?? colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: isDark ? Border.all(color: colorScheme.outline.withValues(alpha: 0.1)) : null,
+        boxShadow: isDark ? [] : [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
@@ -43,13 +47,17 @@ class CartItem extends StatelessWidget {
                     item['name'],
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     'LKR ${item['price'].toStringAsFixed(0)} each',
                     style: TextStyle(
-                      color: Theme.of(context).hintColor,
+                      color: colorScheme.onSurface.withValues(alpha: 0.6),
                       fontSize: 12,
                     ),
                   ),
@@ -59,7 +67,7 @@ class CartItem extends StatelessWidget {
             const SizedBox(width: 10),
             Container(
               decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
+                color: isDark ? colorScheme.surfaceContainerHighest : theme.scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -88,7 +96,7 @@ class CartItem extends StatelessWidget {
             ),
             IconButton(
               onPressed: onRemove,
-              icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFEF4444)),
+              icon: Icon(Icons.delete_outline, size: 20, color: colorScheme.error),
               visualDensity: VisualDensity.compact,
             ),
           ],
@@ -111,7 +119,7 @@ class _QtyBtn extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.all(6),
-        child: Icon(icon, size: 16, color: const Color(0xFF4B5563)),
+        child: Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary),
       ),
     );
   }

@@ -34,10 +34,10 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   late AnimationController _hideBottomBarAnimationController;
 
   final iconList = <IconData>[
-    Icons.dashboard,
-    Icons.production_quantity_limits_sharp,
-    Icons.settings,
-    Icons.verified_user,
+    Icons.dashboard_rounded,
+    Icons.inventory_2_rounded,
+    Icons.settings_rounded,
+    Icons.person_rounded,
   ];
 
   @override
@@ -111,7 +111,15 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Custom logic: Dark bar for Light Mode, Light bar for Dark Mode
+    final navBarBgColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final navActiveColor = isDark ? colors.primary : colors.secondary;
+    final navInactiveColor = isDark ? Colors.black.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.5);
+
     return AppBackScope(
       allowSystemPop: true,
       onBack: () {
@@ -128,51 +136,51 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
           child: _buildBodyScreen(_bottomNavIndex),
         ),
         floatingActionButton: FloatingActionButton(
-          backgroundColor: const Color(0xFF111184),
+          backgroundColor: colors.primary,
           shape: const CircleBorder(),
-          child: const Icon(Icons.point_of_sale, color: Colors.white),
+          child: Icon(Icons.point_of_sale, color: colors.onPrimary),
           onPressed: () {
             context.go('/pos_terminal');
           },
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: AnimatedBottomNavigationBar.builder(
-        height: 52,
+        height: 54,
         itemCount: iconList.length,
         tabBuilder: (int index, bool isActive) {
-          final color = isActive ? colors.secondary : colors.onPrimary.withValues(alpha: 0.6);
+          final color = isActive ? navActiveColor : navInactiveColor;
           return Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 iconList[index],
-                size: 20,
+                size: 22,
                 color: color,
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 3),
               Text(
                 index == 0
-                    ? 'Home'
+                    ? 'Dashboard'
                     : index == 1
-                        ? 'Items'
+                        ? 'Management'
                         : index == 2
-                            ? 'Admin'
-                            : 'User',
+                            ? 'Settings'
+                            : 'Profile',
                 maxLines: 1,
                 style: TextStyle(
                   color: color,
                   fontSize: 10,
-                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
                   letterSpacing: 0.2,
                 ),
               ),
             ],
           );
         },
-        backgroundColor: const Color(0xFF0F172A), // Deep Slate/Blue
+        backgroundColor: navBarBgColor,
         activeIndex: _bottomNavIndex,
-        splashColor: colors.secondary.withValues(alpha: 0.3),
+        splashColor: navActiveColor.withValues(alpha: 0.3),
         notchAndCornersAnimation: borderRadiusAnimation,
         splashSpeedInMilliseconds: 300,
         notchSmoothness: NotchSmoothness.softEdge,

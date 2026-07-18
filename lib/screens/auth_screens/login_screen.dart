@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mpos/utils/custom_snackbar.dart';
 import 'package:mpos/main_widget/main_button.dart';
 import 'package:mpos/provider/auth_provider/auth_provider.dart';
 import 'package:mpos/utils/app_back_scope.dart';
@@ -39,22 +40,12 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
           throw Exception('Invalid credentials');
         }
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login successful')),
-        );
+        CustomSnackBar.success(context, 'Login successful');
         context.go('/mainNavigation');
-        // Navigator.of(context).pushAndRemoveUntil(
-        //   MaterialPageRoute(
-        //     builder: (_) => MyHomePage(title: 'Main Navigation'),
-        //   ),
-        //   (route) => false,
-        // );
-      }
+    }
       catch(e){
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login failed: $e')),
-        );
+        CustomSnackBar.error(context, 'Login failed: $e');
       }
     }
   }

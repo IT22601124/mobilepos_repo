@@ -6,7 +6,9 @@ import 'package:mpos/app_theme/app_theme.dart';
 import 'package:mpos/resources/color_resources.dart';
 import 'package:provider/provider.dart';
 
-import '../../provider/auth_provider/auth_provider.dart';
+import 'package:mpos/provider/onboarding_provider.dart';
+import 'package:mpos/provider/auth_provider/auth_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../provider/splash_provider/splash_provider.dart'; // Import color resources
 
 class NovaSplashSelector extends StatefulWidget {
@@ -25,6 +27,7 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
   String _statusText = 'Initializing security node...';
   Timer? _progressTimer;
   String? errorMessage;
+  static const _onboardingKey = 'has_completed_onboarding';
 
   @override
   void initState() {
@@ -67,7 +70,16 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
     await Future.delayed(const Duration(milliseconds: 900));
     if (!mounted) return;
 
+    final onboardingProvider = Provider.of<OnboardingProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final prefs = await SharedPreferences.getInstance();
+    final hasCompletedOnboarding = prefs.getBool(_onboardingKey) ?? false;
+
+    if (!hasCompletedOnboarding) {
+      context.go('/onboarding');
+      return;
+    }
+
     final isTokenValid = await authProvider.verifyStoredToken();
     if (!mounted) return;
 
@@ -122,7 +134,7 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: Padding(
         padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
         child: Center(

@@ -37,15 +37,17 @@ class _PaymentPanelState extends State<PaymentPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     if (widget.isCartEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          border: Border(top: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.5))),
+          color: theme.cardTheme.color ?? colors.surface,
+          border: Border(top: BorderSide(color: colors.outline.withValues(alpha: 0.1))),
         ),
         child: SafeArea(
           top: false,
@@ -53,7 +55,7 @@ class _PaymentPanelState extends State<PaymentPanel> {
             'Select items to continue',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Theme.of(context).hintColor,
+              color: colors.onSurface.withValues(alpha: 0.5),
               fontWeight: FontWeight.w600,
               fontSize: 13,
             ),
@@ -64,8 +66,9 @@ class _PaymentPanelState extends State<PaymentPanel> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: [
+        color: theme.cardTheme.color ?? colors.surface,
+        border: isDark ? Border(top: BorderSide(color: colors.outline.withValues(alpha: 0.1))) : null,
+        boxShadow: isDark ? [] : [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
@@ -95,7 +98,7 @@ class _PaymentPanelState extends State<PaymentPanel> {
                               Text(
                                 'TOTAL PAYABLE',
                                 style: TextStyle(
-                                  color: Theme.of(context).hintColor,
+                                  color: colors.onSurface.withValues(alpha: 0.5),
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 1.2,
@@ -239,7 +242,7 @@ class _CompactField extends StatelessWidget {
         prefixIcon: Icon(icon, size: 18),
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        fillColor: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.5),
+        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         filled: true,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -260,19 +263,21 @@ class _CompactDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.5),
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(10),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
           isExpanded: true,
+          dropdownColor: theme.colorScheme.surfaceContainerHighest,
           icon: const Icon(Icons.arrow_drop_down_rounded),
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface,
+            color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.w700,
             fontSize: 14,
           ),

@@ -5,41 +5,47 @@ class ManagementHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        border: Border(
-          bottom: BorderSide(color: Theme.of(context).dividerColor),
-        ),
-      ),
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+      color: colorScheme.surface,
       child: Row(
         children: [
           Container(
-            height: 46,
-            width: 46,
+            height: 40,
+            width: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(10),
+              color: isDark ? colorScheme.surfaceContainerHighest : const Color(0xFFF4F7FB),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.storefront, color: Color(0xFF2F80ED)),
+            child: Icon(
+              Icons.storefront,
+              color: isDark ? colorScheme.primary : const Color(0xFF334155),
+              size: 22,
+            ),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'POS Management',
                   style: TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF111827),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
                   ),
                 ),
                 Text(
                   'Reports, stock, cashiers and credit',
-                  style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                  style: TextStyle(
+                    color: colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -47,19 +53,22 @@ class ManagementHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
+              color: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFF0FDF4),
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: const Color(0xFFBBF7D0)),
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.verified, color: Color(0xFF16A34A), size: 16),
-                SizedBox(width: 5),
+                Icon(
+                  Icons.verified,
+                  color: isDark ? const Color(0xFF10B981) : const Color(0xFF16A34A),
+                  size: 16,
+                ),
+                const SizedBox(width: 5),
                 Text(
                   'Live API',
                   style: TextStyle(
-                    color: Color(0xFF15803D),
+                    color: isDark ? const Color(0xFF10B981) : const Color(0xFF15803D),
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
                   ),

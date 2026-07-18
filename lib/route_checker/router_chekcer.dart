@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 import 'package:mpos/screens/auth_screens/login_screen.dart';
 import 'package:mpos/screens/auth_screens/register_screen.dart';
+import 'package:mpos/screens/onboarding_screen/onboarding_screen.dart';
 import 'package:mpos/screens/splash_screen/splash_screen.dart';
 import 'package:mpos/screens/overview/dashboard_screen.dart';
 
@@ -9,8 +10,8 @@ import '../screens/pos_management_screen/pos_management_screen.dart';
 import '../screens/pos_screen/pos_payment_screen.dart';
 import '../screens/pos_screen/pos_payment_success_screen.dart';
 import '../screens/pos_screen/pos_terminal_screen.dart';
-import '../screens/settings/printing_options_screen.dart';
-//import '../screens/store_management/store_management_screen.dart';
+// import '../screens/settings/printing_options_screen.dart';
+import '../screens/store_management/store_management_screen.dart';
 
 final GoRouter router = GoRouter(
   initialLocation: '/splash',
@@ -18,6 +19,10 @@ final GoRouter router = GoRouter(
     GoRoute(
       path: '/splash',
       builder: (context, state) => const NovaSplashSelector(),
+    ),
+    GoRoute(
+      path: '/onboarding',
+      builder: (context, state) => const OnboardingScreen(),
     ),
     GoRoute(
       path: '/login',
@@ -59,10 +64,10 @@ final GoRouter router = GoRouter(
       path: '/pos-management',
       builder: (context, state) => const PosManagementScreen(),
     ),
-    GoRoute(
-      path: '/printing-options',
-      builder: (context, state) => const PrintingOptionsScreen(),
-    ),
+    // GoRoute(
+    //   path: '/printing-options',
+    //   builder: (context, state) => const PrintingOptionsScreen(),
+    // ),
     GoRoute(
       path: '/pos-payment-success',
       builder: (context, state) {
@@ -91,10 +96,10 @@ final GoRouter router = GoRouter(
         );
       },
     ),
-    // GoRoute(
-    //   path: '/store-management',
-    //   builder: (context, state) => const StoreManagementScreen(),
-    // ),
+    GoRoute(
+      path: '/store-management',
+      builder: (context, state) => const StoreManagementScreen(),
+    ),
   ],
 );
 

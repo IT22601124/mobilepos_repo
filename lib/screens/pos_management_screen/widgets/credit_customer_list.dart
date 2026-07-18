@@ -5,6 +5,9 @@ class CreditCustomerList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final customers = [];
 
     return Column(
@@ -12,29 +15,50 @@ class CreditCustomerList extends StatelessWidget {
         return Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
-          decoration: _cardDecoration(),
+          decoration: _cardDecoration(context),
           child: Row(
             children: [
-              const CircleAvatar(
-                backgroundColor: Color(0xFFFFF7ED),
-                child: Icon(Icons.account_balance_wallet_outlined, color: Color(0xFFF59E0B)),
+              Container(
+                height: 36,
+                width: 36,
+                decoration: BoxDecoration(
+                  color: isDark ? colorScheme.surface : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet_outlined,
+                  color: Color(0xFFD97706),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item[0], style: const TextStyle(fontWeight: FontWeight.w900)),
-                    Text(item[1], style: const TextStyle(color: Color(0xFF6B7280))),
+                    Text(
+                      item[0],
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    Text(
+                      item[1],
+                      style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.6)),
+                    ),
                     const SizedBox(height: 6),
-                    Text('Limit ${item[2]}', style: const TextStyle(fontSize: 12)),
+                    Text(
+                      'Limit ${item[2]}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
                   ],
                 ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text('Balance', style: TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
+                  Text(
+                    'Balance',
+                    style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
+                  ),
                   Text(
                     item[3],
                     style: const TextStyle(
@@ -52,10 +76,13 @@ class CreditCustomerList extends StatelessWidget {
   }
 }
 
-BoxDecoration _cardDecoration() {
+BoxDecoration _cardDecoration(BuildContext context) {
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+
   return BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(14),
-    border: Border.all(color: const Color(0xFFE5E7EB)),
+    color: isDark ? theme.colorScheme.surfaceContainerHighest : const Color(0xFFEAF1FB),
+    borderRadius: BorderRadius.circular(8),
+    border: isDark ? Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.1)) : null,
   );
 }

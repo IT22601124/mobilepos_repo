@@ -17,28 +17,48 @@ class ProductStockList extends StatelessWidget {
           decoration: _cardDecoration(),
           child: Row(
             children: [
-              const CircleAvatar(
-                backgroundColor: Color(0xFFEFF6FF),
-                child: Icon(Icons.inventory_2_outlined, color: Color(0xFF2F80ED)),
+              Container(
+                height: 36,
+                width: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(
+                  Icons.inventory_2_outlined,
+                  color: Color(0xFF334155),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item[0].toString(), style: const TextStyle(fontWeight: FontWeight.w900)),
-                    Text(item[1].toString(), style: const TextStyle(color: Color(0xFF6B7280))),
+                    Text(
+                      item[0].toString(),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    Text(
+                      item[1].toString(),
+                      style: const TextStyle(color: Color(0xFF6B7280)),
+                    ),
                   ],
                 ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('${item[2]} stock', style: const TextStyle(fontWeight: FontWeight.w800)),
+                  Text(
+                    '${item[2]} stock',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
                   Text(
                     item[3].toString(),
                     style: TextStyle(
-                      color: low ? const Color(0xFFF59E0B) : const Color(0xFF23C16B),
+                      color: low
+                          ? const Color(0xFFF59E0B)
+                          : const Color(0xFF23C16B),
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -54,8 +74,7 @@ class ProductStockList extends StatelessWidget {
 
 BoxDecoration _cardDecoration() {
   return BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(14),
-    border: Border.all(color: const Color(0xFFE5E7EB)),
+    color: const Color(0xFFEAF1FB),
+    borderRadius: BorderRadius.circular(6),
   );
 }

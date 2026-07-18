@@ -9,6 +9,12 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? _currentUserName;
   String? get currentUserName => _currentUserName;
+  int? _roleId;
+  int? get roleId => _roleId;
+  int? _userId;
+  int? get userId => _userId;
+
+  bool get isSuperAdmin => _roleId == 1;
 
   final _dioClient = DioClient().dio;
 
@@ -47,10 +53,19 @@ class AuthProvider extends ChangeNotifier {
       );
       if (response.statusCode == 200) {
         String token = response.data['access_token'];
+        final userData = response.data['user'] ?? {};
+        
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('access_token', token);
-        _currentUserName = response.data['name']?.toString() ?? 'Super Admin';
+        
+        _currentUserName = response.data['name']?.toString() ?? userData['name']?.toString() ?? 'User';
+        _roleId = response.data['role_id'] ?? userData['role_id'];
+        _userId = response.data['id'] ?? userData['id'];
+
         await prefs.setString('current_user_name', _currentUserName!);
+        if (_roleId != null) await prefs.setInt('user_role_id', _roleId!);
+        if (_userId != null) await prefs.setInt('user_id', _userId!);
+
         return true;
       }
       return false;
@@ -63,8 +78,10 @@ class AuthProvider extends ChangeNotifier {
 
       if (isDemoAdmin || isRegisteredDemo) {
         _currentUserName = prefs.getString('demo_user_name') ?? 'Super Admin';
+        _roleId = isDemoAdmin ? 1 : 2; // Demo admin is super admin
         await prefs.setString('access_token', 'demo-token');
         await prefs.setString('current_user_name', _currentUserName!);
+        await prefs.setInt('user_role_id', _roleId!);
         return true;
       }
 
@@ -78,6 +95,8 @@ class AuthProvider extends ChangeNotifier {
   Future<void> restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
     _currentUserName = prefs.getString('current_user_name');
+    _roleId = prefs.getInt('user_role_id');
+    _userId = prefs.getInt('user_id');
     notifyListeners();
   }
 
@@ -85,19 +104,31 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
-    if (token == null || token.isEmpty || token == 'demo-token') {
+    if (token == null || token.isEmpty) {
       await logout();
       return false;
+    }
+    
+    if (token == 'demo-token') {
+      await restoreSession();
+      return true;
     }
 
     try {
       final response = await _dioClient.post(ApiRoutes.verifyToken);
       final data = response.data;
-      final isRejected =
-          data is Map && (data['valid'] == false || data['success'] == false);
+      final isSuccess = data is Map && (data['success'] == true);
 
-      if (response.statusCode == 200 && !isRejected) {
-        await restoreSession();
+      if (response.statusCode == 200 && isSuccess) {
+        final userData = data['user'] ?? {};
+        _currentUserName = userData['name']?.toString() ?? 'User';
+        _roleId = userData['role_id'];
+        _userId = userData['id'];
+        
+        await prefs.setString('current_user_name', _currentUserName!);
+        if (_roleId != null) await prefs.setInt('user_role_id', _roleId!);
+        if (_userId != null) await prefs.setInt('user_id', _userId!);
+        
         return true;
       }
     } catch (e) {

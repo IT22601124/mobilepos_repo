@@ -140,12 +140,18 @@ class PosPaymentSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return AppBackScope(
       fallbackRoute: '/pos_terminal',
       child: Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: [
           IconButton(
             tooltip: 'Close',
@@ -160,12 +166,12 @@ class PosPaymentSuccessScreen extends StatelessWidget {
           children: [
             const SizedBox(height: 20),
 
-            const CircleAvatar(
+            CircleAvatar(
               radius: 38,
-              backgroundColor: Color(0xFFEAFBF1),
-              child: Icon(
+              backgroundColor: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFEAFBF1),
+              child: const Icon(
                 Icons.check_circle,
-                color: Color(0xFF23C16B),
+                color: Color(0xFF10B981),
                 size: 54,
               ),
             ),
@@ -178,7 +184,7 @@ class PosPaymentSuccessScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
-                  color: Theme.of(context).colorScheme.onSurface,
+                  color: colorScheme.onSurface,
                 ),
               ),
             ),
@@ -188,8 +194,8 @@ class PosPaymentSuccessScreen extends StatelessWidget {
             Center(
               child: Text(
                 saleNo,
-                style: const TextStyle(
-                  color: Color(0xFF6B7280),
+                style: TextStyle(
+                  color: colorScheme.onSurface.withValues(alpha: 0.6),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -215,29 +221,55 @@ class PosPaymentSuccessScreen extends StatelessWidget {
               cart: cart,
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
+
+            // Receipt Actions Section
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: sharePdfReceipt,
+                    icon: const Icon(Icons.share_rounded),
+                    label: const Text('Share'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: printReceipt,
+                    icon: const Icon(Icons.file_download_outlined),
+                    label: const Text('Download'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
 
             ElevatedButton.icon(
               onPressed: printReceipt,
-              icon: const Icon(Icons.print),
+              icon: const Icon(Icons.print_rounded),
               label: const Text('Print Receipt'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF23C16B),
+                backgroundColor: const Color(0xFF10B981),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
 
-            const SizedBox(height: 10),
-
-            OutlinedButton.icon(
-              onPressed: sharePdfReceipt,
-              icon: const Icon(Icons.picture_as_pdf),
-              label: const Text('Save / Share PDF Receipt'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 15),
-              ),
-            ),
+            const SizedBox(height: 20),
+            
+            const Divider(),
 
             const SizedBox(height: 10),
 
@@ -245,6 +277,9 @@ class PosPaymentSuccessScreen extends StatelessWidget {
               onPressed: () => context.go('/pos_terminal'),
               icon: const Icon(Icons.point_of_sale),
               label: const Text('Start New Sale'),
+              style: TextButton.styleFrom(
+                foregroundColor: colorScheme.primary,
+              ),
             ),
           ],
         ),
@@ -406,7 +441,7 @@ class _InfoRow extends StatelessWidget {
             value,
             style: TextStyle(
               color: strong
-                  ? const Color(0xFF23C16B)
+                  ? const Color(0xFF10B981)
                   : Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.w900,
             ),
@@ -418,11 +453,15 @@ class _InfoRow extends StatelessWidget {
 }
 
 BoxDecoration _cardDecoration(BuildContext context) {
+  final theme = Theme.of(context);
+  final colorScheme = theme.colorScheme;
+  final isDark = theme.brightness == Brightness.dark;
+
   return BoxDecoration(
-    color: Theme.of(context).cardColor,
+    color: theme.cardTheme.color ?? colorScheme.surface,
     borderRadius: BorderRadius.circular(16),
-    border: Border.all(color: Theme.of(context).dividerColor),
-    boxShadow: const [
+    border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+    boxShadow: isDark ? [] : const [
       BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, 4)),
     ],
   );

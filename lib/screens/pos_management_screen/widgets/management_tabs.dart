@@ -14,11 +14,15 @@ class ManagementTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
-      height: 58,
-      color: Theme.of(context).cardColor,
+      height: 54,
+      color: colorScheme.surface,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         scrollDirection: Axis.horizontal,
         itemCount: tabs.length,
         separatorBuilder: (context, index) => const SizedBox(width: 8),
@@ -26,24 +30,29 @@ class ManagementTabs extends StatelessWidget {
           final tab = tabs[index];
           final active = tab == activeTab;
 
-          return ChoiceChip(
-            label: Text(tab),
-            selected: active,
-            selectedColor: const Color(0xFF23C16B),
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            side: BorderSide(
-              color: active
-                  ? const Color(0xFF23C16B)
-                  : Theme.of(context).dividerColor,
+          return InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => onChanged(tab),
+            child: Container(
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: active
+                    ? (isDark ? colorScheme.primary : const Color(0xFF0F172A))
+                    : (isDark ? colorScheme.surfaceContainerHighest : const Color(0xFFF1F5F9)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                tab,
+                style: TextStyle(
+                  color: active
+                      ? (isDark ? colorScheme.onPrimary : Colors.white)
+                      : colorScheme.onSurface.withValues(alpha: 0.6),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
             ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            labelStyle: TextStyle(
-              color: active ? Colors.white : const Color(0xFF374151),
-              fontWeight: FontWeight.w800,
-            ),
-            onSelected: (_) => onChanged(tab),
           );
         },
       ),

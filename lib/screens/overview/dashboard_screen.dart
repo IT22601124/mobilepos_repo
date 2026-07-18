@@ -55,16 +55,18 @@ class _DashBaordScrrenState extends State<DashBaordScrren> {
   @override
   Widget build(BuildContext context) {
     final dashboard = _dashboard;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FB),
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: colorScheme.surface,
         elevation: 0,
         title: Text(
           dashboard.storeName,
-          style: const TextStyle(
-            color: Color(0xFF111827),
+          style: TextStyle(
+            color: colorScheme.onSurface,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -78,7 +80,7 @@ class _DashBaordScrrenState extends State<DashBaordScrren> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.refresh),
-            color: const Color(0xFF111827),
+            color: colorScheme.onSurface,
           ),
         ],
       ),
@@ -106,13 +108,13 @@ class _DashBaordScrrenState extends State<DashBaordScrren> {
                     title: 'Net Sales',
                     value: _money(dashboard.metrics.netSales),
                     icon: Icons.trending_up,
-                    color: const Color(0xFF23C16B),
+                    color: const Color(0xFF10B981),
                   ),
                   _MetricCard(
                     title: 'Collected',
                     value: _money(dashboard.metrics.collected),
                     icon: Icons.payments_outlined,
-                    color: const Color(0xFF2F80ED),
+                    color: const Color(0xFF3B82F6),
                   ),
                   _MetricCard(
                     title: 'Credit Due',
@@ -124,7 +126,7 @@ class _DashBaordScrrenState extends State<DashBaordScrren> {
                     title: 'Items Sold',
                     value: _number(dashboard.metrics.itemsSold),
                     icon: Icons.shopping_bag_outlined,
-                    color: const Color(0xFFE056FD),
+                    color: const Color(0xFF8B5CF6),
                   ),
                 ],
               ),
@@ -332,22 +334,25 @@ class _StatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
+        color: isDark ? const Color(0xFF78350F).withValues(alpha: 0.2) : const Color(0xFFFFFBEB),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFDE68A)),
+        border: Border.all(color: isDark ? const Color(0xFF92400E).withValues(alpha: 0.4) : const Color(0xFFFDE68A)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, color: Color(0xFFD97706)),
+          Icon(Icons.info_outline, color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706)),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
-                color: Color(0xFF92400E),
+              style: TextStyle(
+                color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -518,6 +523,9 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Expanded(
       child: InkWell(
         onTap: onTap,
@@ -525,14 +533,14 @@ class _ActionButton extends StatelessWidget {
         child: Container(
           height: 72,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: colorScheme.surface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
+            border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: const Color(0xFF111827)),
+              Icon(icon, color: colorScheme.onSurface),
               const SizedBox(height: 6),
               Text(
                 label,
@@ -556,10 +564,11 @@ class _SalesChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       height: 210,
       padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -570,14 +579,14 @@ class _SalesChartCard extends StatelessWidget {
           const SizedBox(height: 20),
           Expanded(
             child: points.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       'No chart data',
-                      style: TextStyle(color: Color(0xFF6B7280)),
+                      style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                     ),
                   )
                 : CustomPaint(
-                    painter: _LineChartPainter(points),
+                    painter: _LineChartPainter(points, theme.colorScheme.primary),
                     child: Container(),
                   ),
           ),
@@ -589,8 +598,9 @@ class _SalesChartCard extends StatelessWidget {
 
 class _LineChartPainter extends CustomPainter {
   final List<_ChartPoint> chartPoints;
+  final Color primaryColor;
 
-  const _LineChartPainter(this.chartPoints);
+  const _LineChartPainter(this.chartPoints, this.primaryColor);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -602,13 +612,13 @@ class _LineChartPainter extends CustomPainter {
     final effectiveMax = maxValue <= 0 ? 1 : maxValue;
 
     final paintLine = Paint()
-      ..color = const Color(0xFF2F80ED)
+      ..color = primaryColor
       ..strokeWidth = 4
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
     final fillPaint = Paint()
-      ..color = const Color(0xFF2F80ED).withValues(alpha: 0.12)
+      ..color = primaryColor.withValues(alpha: 0.12)
       ..style = PaintingStyle.fill;
 
     final widthStep = chartPoints.length == 1
@@ -654,13 +664,14 @@ class _CashierCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final color = cashier.credit > 0
         ? const Color(0xFFF59E0B)
-        : const Color(0xFF23C16B);
+        : const Color(0xFF10B981);
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Column(
         children: [
           Row(
@@ -683,7 +694,7 @@ class _CashierCard extends StatelessWidget {
                     ),
                     Text(
                       cashier.role,
-                      style: const TextStyle(color: Color(0xFF6B7280)),
+                      style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                     ),
                   ],
                 ),
@@ -728,12 +739,13 @@ class _MiniValue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+          style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
         ),
         const SizedBox(height: 4),
         Text(
@@ -752,15 +764,18 @@ class _RecentSaleTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Row(
         children: [
-          const CircleAvatar(
-            backgroundColor: Color(0xFFEFF6FF),
-            child: Icon(Icons.receipt_long, color: Color(0xFF2F80ED)),
+          CircleAvatar(
+            backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+            child: Icon(Icons.receipt_long, color: theme.colorScheme.primary),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -775,7 +790,7 @@ class _RecentSaleTile extends StatelessWidget {
                   '${sale.customer} / ${sale.paymentMethod}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFF6B7280)),
+                  style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                 ),
               ],
             ),
@@ -797,14 +812,15 @@ class _EmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Center(
         child: Text(
           message,
-          style: const TextStyle(
-            color: Color(0xFF6B7280),
+          style: TextStyle(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -820,23 +836,27 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w800,
-        color: Color(0xFF111827),
+        color: theme.colorScheme.onSurface,
       ),
     );
   }
 }
 
-BoxDecoration _cardDecoration() {
+BoxDecoration _cardDecoration(BuildContext context) {
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+
   return BoxDecoration(
-    color: Colors.white,
+    color: theme.cardTheme.color ?? theme.colorScheme.surface,
     borderRadius: BorderRadius.circular(14),
-    border: Border.all(color: const Color(0xFFE5E7EB)),
-    boxShadow: [
+    border: Border.all(color: theme.colorScheme.outline.withValues(alpha: isDark ? 0.1 : 0.2)),
+    boxShadow: isDark ? [] : [
       BoxShadow(
         color: Colors.black.withValues(alpha: 0.04),
         blurRadius: 12,

@@ -1,3 +1,4 @@
+import 'package:mpos/utils/custom_snackbar.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -222,14 +223,11 @@ class _StoreManagementScreenState extends State<StoreManagementScreen> {
 
   void _showSnack(String message, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError
-            ? const Color(0xFFEF4444)
-            : const Color(0xFF23C16B),
-      ),
-    );
+    if (isError) {
+      CustomSnackBar.error(context, message);
+    } else {
+      CustomSnackBar.success(context, message);
+    }
   }
 
   @override
@@ -343,8 +341,8 @@ class _StoreManagementScreenState extends State<StoreManagementScreen> {
                           _profile == null ? 'Create Store' : 'Save Store',
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2F80ED),
-                          foregroundColor: Colors.white,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -383,11 +381,11 @@ class _LogoCard extends StatelessWidget {
             child: Container(
               width: 72,
               height: 72,
-              color: const Color(0xFFEFF6FF),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               child: logoUrl.isEmpty
-                  ? const Icon(
+                  ? Icon(
                       Icons.storefront,
-                      color: Color(0xFF2F80ED),
+                      color: Theme.of(context).colorScheme.primary,
                       size: 34,
                     )
                   : Image.network(

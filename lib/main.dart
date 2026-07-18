@@ -1,6 +1,7 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:mpos/provider/auth_provider/auth_provider.dart';
+import 'package:mpos/provider/onboarding_provider.dart';
 import 'package:mpos/provider/splash_provider/splash_provider.dart';
 import 'package:mpos/provider/theme_provider/theme_provider.dart';
 import 'package:mpos/route_checker/router_chekcer.dart';
@@ -39,6 +40,7 @@ Future<void> main() async{
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => OnboardingProvider()),
         ChangeNotifierProvider(create: (_) => SplashProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
       ],
