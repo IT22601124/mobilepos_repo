@@ -44,8 +44,7 @@ class ApiRoutes {
   static const String reportCredit = 'pos-sales/reports/credit';
 
   static const String posSettings = 'pos-settings';
-  static const String posSettingsPaymentMethods =
-      'pos-settings/payment-methods';
+  static const String posSettingsPaymentMethods = 'pos-settings/payment-methods';
   static const String posSettingsReceipt = 'pos-settings/receipt';
   static const String posSettingsDiscountRules = 'pos-settings/discount-rules';
 
