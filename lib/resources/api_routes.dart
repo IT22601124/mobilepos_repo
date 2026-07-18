@@ -1,6 +1,6 @@
 class ApiRoutes {
-   static const String serverUrl = 'http://10.0.2.2:5000';
- // static const String serverUrl = 'https://mpos.studiorespectweddings.com';
+   //static const String serverUrl = 'http://10.0.2.2:5000';
+  static const String serverUrl = 'https://mpos.studiorespectweddings.com';
   static const bool allowBadCertificates = true;
   static const String baseUrl = '$serverUrl/api/';
 
