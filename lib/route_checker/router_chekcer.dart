@@ -10,7 +10,7 @@ import '../screens/pos_management_screen/pos_management_screen.dart';
 import '../screens/pos_screen/pos_payment_screen.dart';
 import '../screens/pos_screen/pos_payment_success_screen.dart';
 import '../screens/pos_screen/pos_terminal_screen.dart';
-// import '../screens/settings/printing_options_screen.dart';
+import '../screens/settings/printing_options_screen.dart';
 import '../screens/store_management/store_management_screen.dart';
 
 final GoRouter router = GoRouter(
@@ -64,10 +64,10 @@ final GoRouter router = GoRouter(
       path: '/pos-management',
       builder: (context, state) => const PosManagementScreen(),
     ),
-    // GoRoute(
-    //   path: '/printing-options',
-    //   builder: (context, state) => const PrintingOptionsScreen(),
-    // ),
+    GoRoute(
+      path: '/printing-options',
+      builder: (context, state) => const PrintingOptionsScreen(),
+    ),
     GoRoute(
       path: '/pos-payment-success',
       builder: (context, state) {

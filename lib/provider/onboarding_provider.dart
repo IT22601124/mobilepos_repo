@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class OnboardingProvider extends ChangeNotifier {
-  static const _onboardingKey = 'has_completed_onboarding';
+  static const _onboardingKey = 'isonboardingscreendispaleyd';
   
   bool _hasCompletedOnboarding = false;
   bool _isLoaded = false;

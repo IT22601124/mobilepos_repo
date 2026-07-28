@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mpos/provider/printing_provider.dart';
 import 'package:mpos/utils/app_back_scope.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:provider/provider.dart';
+import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platform_image_3.dart';
 
-class PosPaymentSuccessScreen extends StatelessWidget {
+class PosPaymentSuccessScreen extends StatefulWidget {
   final String saleNo;
   final String paymentMethod;
   final double subtotal;
@@ -41,18 +45,153 @@ class PosPaymentSuccessScreen extends StatelessWidget {
     required this.logoUrl,
   });
 
-  String money(double value) => '$currencyCode ${value.toStringAsFixed(0)}';
+  @override
+  State<PosPaymentSuccessScreen> createState() => _PosPaymentSuccessScreenState();
+}
 
-  Future<void> printReceipt() async {
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => _buildReceiptPdf().save(),
-    );
+class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handleAutoPrint();
+    });
+  }
+
+  void _handleAutoPrint() {
+    final printingProvider = context.read<PrintingProvider>();
+    if (printingProvider.autoPrint && printingProvider.isConnected) {
+      printReceipt(context);
+    }
+  }
+
+  String money(double value) => '${widget.currencyCode} ${value.toStringAsFixed(0)}';
+
+  Future<void> printReceipt(BuildContext context) async {
+    final printingProvider = context.read<PrintingProvider>();
+
+    if (printingProvider.isConnected) {
+      // Print directly to the thermal printer
+      await _printToThermalPrinter(printingProvider);
+    } else {
+      // Fallback to system print dialog (PDF)
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => _buildReceiptPdf().save(),
+      );
+    }
+  }
+
+  Future<void> _printToThermalPrinter(PrintingProvider provider) async {
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(provider.paperSize, profile);
+    List<int> bytes = [];
+
+    // Header
+    bytes += generator.text(widget.storeName,
+        styles: const PosStyles(
+          align: PosAlign.center,
+          bold: true,
+          height: PosTextSize.size2,
+          width: PosTextSize.size2,
+        ));
+    bytes += generator.text('Sales Receipt',
+        styles: const PosStyles(align: PosAlign.center));
+    bytes += generator.feed(1);
+
+    // Info
+    bytes += generator.text('Sale No: ${widget.saleNo}');
+    bytes += generator.text('Customer: ${widget.customerName}');
+    bytes += generator.text('Payment: ${widget.paymentMethod}');
+    bytes += generator.text('Date: ${DateTime.now().toString().substring(0, 16)}');
+    bytes += generator.hr();
+
+    // Items
+    for (var item in widget.cart) {
+      final qty = item['qty'] as int;
+      final price = item['price'] as double;
+      final lineTotal = qty * price;
+
+      bytes += generator.text(item['name'].toString(),
+          styles: const PosStyles(bold: true));
+      bytes += generator.row([
+        PosColumn(text: '$qty x ${money(price)}', width: 7),
+        PosColumn(
+            text: money(lineTotal),
+            width: 5,
+            styles: const PosStyles(align: PosAlign.right)),
+      ]);
+    }
+
+    bytes += generator.hr();
+
+    // Summary
+    bytes += generator.row([
+      PosColumn(text: 'Subtotal', width: 7),
+      PosColumn(
+          text: money(widget.subtotal),
+          width: 5,
+          styles: const PosStyles(align: PosAlign.right)),
+    ]);
+    bytes += generator.row([
+      PosColumn(text: 'Discount', width: 7),
+      PosColumn(
+          text: money(widget.discount),
+          width: 5,
+          styles: const PosStyles(align: PosAlign.right)),
+    ]);
+    bytes += generator.row([
+      PosColumn(text: 'Tax', width: 7),
+      PosColumn(
+          text: money(widget.tax),
+          width: 5,
+          styles: const PosStyles(align: PosAlign.right)),
+    ]);
+    
+    bytes += generator.hr();
+    
+    bytes += generator.row([
+      PosColumn(
+          text: 'TOTAL',
+          width: 7,
+          styles: const PosStyles(bold: true, height: PosTextSize.size2)),
+      PosColumn(
+          text: money(widget.total),
+          width: 5,
+          styles: const PosStyles(
+              align: PosAlign.right, bold: true, height: PosTextSize.size2)),
+    ]);
+
+    bytes += generator.feed(1);
+    bytes += generator.text('Paid: ${money(widget.paid)}',
+        styles: const PosStyles(align: PosAlign.right));
+    
+    if (widget.paymentMethod == 'Cash') {
+      bytes += generator.text('Change: ${money(widget.change)}',
+          styles: const PosStyles(align: PosAlign.right));
+    }
+    
+    if (widget.paymentMethod == 'Credit') {
+      bytes += generator.text('Credit: ${money(widget.creditAmount)}',
+          styles: const PosStyles(align: PosAlign.right));
+    }
+
+    bytes += generator.feed(2);
+    bytes += generator.text(widget.receiptFooter,
+        styles: const PosStyles(align: PosAlign.center));
+    bytes += generator.feed(3);
+    bytes += generator.cut();
+
+    final type = provider.connectionType == PrinterConnectionType.bluetooth
+        ? PrinterType.bluetooth
+        : PrinterType.usb;
+
+    await provider.printerManager.send(type: type, bytes: bytes);
   }
 
   Future<void> sharePdfReceipt() async {
     final pdfBytes = await _buildReceiptPdf().save();
 
-    await Printing.sharePdf(bytes: pdfBytes, filename: '$saleNo-receipt.pdf');
+    await Printing.sharePdf(bytes: pdfBytes, filename: '${widget.saleNo}-receipt.pdf');
   }
 
   pw.Document _buildReceiptPdf() {
@@ -69,7 +208,7 @@ class PosPaymentSuccessScreen extends StatelessWidget {
               children: [
                 pw.Center(
                   child: pw.Text(
-                    storeName,
+                    widget.storeName,
                     style: pw.TextStyle(
                       fontSize: 18,
                       fontWeight: pw.FontWeight.bold,
@@ -78,13 +217,13 @@ class PosPaymentSuccessScreen extends StatelessWidget {
                 ),
                 pw.Center(child: pw.Text('Sales Receipt')),
                 pw.SizedBox(height: 10),
-                _pdfRow('Sale No', saleNo),
-                _pdfRow('Customer', customerName),
-                _pdfRow('Payment', paymentMethod),
+                _pdfRow('Sale No', widget.saleNo),
+                _pdfRow('Customer', widget.customerName),
+                _pdfRow('Payment', widget.paymentMethod),
                 _pdfRow('Date', DateTime.now().toString().substring(0, 16)),
                 pw.Divider(),
 
-                ...cart.map((item) {
+                ...widget.cart.map((item) {
                   final name = item['name'].toString();
                   final qty = item['qty'] as int;
                   final price = item['price'] as double;
@@ -101,17 +240,17 @@ class PosPaymentSuccessScreen extends StatelessWidget {
                 }),
 
                 pw.Divider(),
-                _pdfRow('Subtotal', money(subtotal)),
-                _pdfRow('Discount', money(discount)),
-                _pdfRow('Tax 8%', money(tax)),
+                _pdfRow('Subtotal', money(widget.subtotal)),
+                _pdfRow('Discount', money(widget.discount)),
+                _pdfRow('Tax 8%', money(widget.tax)),
                 pw.Divider(),
-                _pdfRow('Total', money(total), bold: true),
-                _pdfRow('Paid', money(paid)),
-                if (paymentMethod == 'Cash') _pdfRow('Change', money(change)),
-                if (paymentMethod == 'Credit')
-                  _pdfRow('Credit', money(creditAmount)),
+                _pdfRow('Total', money(widget.total), bold: true),
+                _pdfRow('Paid', money(widget.paid)),
+                if (widget.paymentMethod == 'Cash') _pdfRow('Change', money(widget.change)),
+                if (widget.paymentMethod == 'Credit')
+                  _pdfRow('Credit', money(widget.creditAmount)),
                 pw.SizedBox(height: 14),
-                pw.Center(child: pw.Text(receiptFooter)),
+                pw.Center(child: pw.Text(widget.receiptFooter)),
               ],
             ),
           );
@@ -193,7 +332,7 @@ class PosPaymentSuccessScreen extends StatelessWidget {
 
             Center(
               child: Text(
-                saleNo,
+                widget.saleNo,
                 style: TextStyle(
                   color: colorScheme.onSurface.withValues(alpha: 0.6),
                   fontWeight: FontWeight.w700,
@@ -204,21 +343,21 @@ class PosPaymentSuccessScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             _ReceiptCard(
-              saleNo: saleNo,
-              paymentMethod: paymentMethod,
-              customerName: customerName,
-              storeName: storeName,
-              receiptFooter: receiptFooter,
-              currencyCode: currencyCode,
-              logoUrl: logoUrl,
-              subtotal: subtotal,
-              discount: discount,
-              tax: tax,
-              total: total,
-              paid: paid,
-              change: change,
-              creditAmount: creditAmount,
-              cart: cart,
+              saleNo: widget.saleNo,
+              paymentMethod: widget.paymentMethod,
+              customerName: widget.customerName,
+              storeName: widget.storeName,
+              receiptFooter: widget.receiptFooter,
+              currencyCode: widget.currencyCode,
+              logoUrl: widget.logoUrl,
+              subtotal: widget.subtotal,
+              discount: widget.discount,
+              tax: widget.tax,
+              total: widget.total,
+              paid: widget.paid,
+              change: widget.change,
+              creditAmount: widget.creditAmount,
+              cart: widget.cart,
             ),
 
             const SizedBox(height: 20),
@@ -240,7 +379,7 @@ class PosPaymentSuccessScreen extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: printReceipt,
+                    onPressed: () => printReceipt(context),
                     icon: const Icon(Icons.file_download_outlined),
                     label: const Text('Download'),
                     style: OutlinedButton.styleFrom(
@@ -255,7 +394,7 @@ class PosPaymentSuccessScreen extends StatelessWidget {
             const SizedBox(height: 12),
 
             ElevatedButton.icon(
-              onPressed: printReceipt,
+              onPressed: () => printReceipt(context),
               icon: const Icon(Icons.print_rounded),
               label: const Text('Print Receipt'),
               style: ElevatedButton.styleFrom(

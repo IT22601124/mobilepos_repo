@@ -204,6 +204,95 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
     }
   }
 
+  Future<void> _handleCreateCustomer(Map<String, dynamic> data) async {
+    try {
+      setState(() => isLoadingCustomers = true);
+      final response = await _dio.post(ApiRoutes.customers, data: data);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (mounted) {
+          CustomSnackBar.success(context, 'Customer created successfully');
+          await _loadCustomers();
+          setState(() {
+            selectedCustomer = data['name']?.toString() ?? selectedCustomer;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        CustomSnackBar.error(context, 'Failed to create customer');
+      }
+    } finally {
+      if (mounted) setState(() => isLoadingCustomers = false);
+    }
+  }
+
+  void _showCreateCustomerDialog() {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final limitController = TextEditingController(text: '10000');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add New Customer'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Customer Name *',
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Phone Number',
+                  prefixIcon: Icon(Icons.phone_android_outlined),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: limitController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Credit Limit',
+                  prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameController.text.trim().isEmpty) {
+                CustomSnackBar.error(context, 'Name is required');
+                return;
+              }
+              Navigator.pop(context);
+              _handleCreateCustomer({
+                'name': nameController.text.trim(),
+                'phone': phoneController.text.trim(),
+                'credit_limit': double.tryParse(limitController.text) ?? 10000,
+                'status': true,
+              });
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> completePayment() async {
     if (!canComplete || isSubmitting) return;
     setState(() => isSubmitting = true);
@@ -483,6 +572,8 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
                             dueDays = value;
                           });
                         },
+                        onAddCustomer: _showCreateCustomerDialog,
+                        onManageCustomers: () => context.go('/pos-management'),
                       ),
                       const SizedBox(height: 14),
                     ],
@@ -686,6 +777,8 @@ class _CreditBox extends StatelessWidget {
   final bool isLoading;
   final ValueChanged<String> onCustomerChanged;
   final ValueChanged<int> onDueDaysChanged;
+  final VoidCallback onAddCustomer;
+  final VoidCallback onManageCustomers;
 
   const _CreditBox({
     required this.customers,
@@ -696,6 +789,8 @@ class _CreditBox extends StatelessWidget {
     required this.isLoading,
     required this.onCustomerChanged,
     required this.onDueDaysChanged,
+    required this.onAddCustomer,
+    required this.onManageCustomers,
   });
 
   String money(double value) => 'LKR ${value.toStringAsFixed(0)}';
@@ -712,37 +807,68 @@ class _CreditBox extends StatelessWidget {
               padding: EdgeInsets.only(bottom: 10),
               child: LinearProgressIndicator(),
             ),
-          DropdownButtonFormField<String>(
-            initialValue: selectedCustomer,
-            decoration: InputDecoration(
-              labelText: 'Credit customer',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: selectedCustomer,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Credit customer',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: customers.map((customer) {
+                    return DropdownMenuItem<String>(
+                      value: customer['name'].toString(),
+                      child: Text(
+                        '${customer['name']} - ${customer['phone']}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) onCustomerChanged(value);
+                  },
+                ),
               ),
-            ),
-            items: customers.map((customer) {
-              return DropdownMenuItem<String>(
-                value: customer['name'].toString(),
-                child: Text('${customer['name']} - ${customer['phone']}'),
-              );
-            }).toList(),
-            onChanged: (value) {
-              if (value != null) onCustomerChanged(value);
-            },
+              const SizedBox(width: 8),
+              IconButton.filledTonal(
+                onPressed: onAddCustomer,
+                icon: const Icon(Icons.person_add_alt_1_outlined),
+                tooltip: 'Quick add customer',
+              ),
+            ],
           ),
           const SizedBox(height: 10),
-          TextField(
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: 'Due days',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Due days',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  controller: TextEditingController(text: dueDays.toString()),
+                  onChanged: (value) {
+                    onDueDaysChanged(int.tryParse(value) ?? 1);
+                  },
+                ),
               ),
-            ),
-            controller: TextEditingController(text: dueDays.toString()),
-            onChanged: (value) {
-              onDueDaysChanged(int.tryParse(value) ?? 1);
-            },
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: onManageCustomers,
+                icon: const Icon(Icons.settings_outlined, size: 18),
+                label: const Text('Manage'),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           _InfoRow(label: 'Available credit', value: money(availableCredit)),

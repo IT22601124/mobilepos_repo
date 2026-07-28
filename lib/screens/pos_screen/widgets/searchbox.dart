@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 class SearchBox extends StatelessWidget {
   final ValueChanged<String> onChanged;
+  final VoidCallback onScanTap;
 
-  const SearchBox({super.key, required this.onChanged});
+  const SearchBox({super.key, required this.onChanged, required this.onScanTap});
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +23,10 @@ class SearchBox extends StatelessWidget {
               fontWeight: FontWeight.w500,
             ),
             prefixIcon: Icon(Icons.search_rounded, size: 20, color: Theme.of(context).hintColor),
-            suffixIcon: Icon(Icons.qr_code_scanner_rounded, size: 20, color: Theme.of(context).colorScheme.primary),
+            suffixIcon: IconButton(
+              icon: Icon(Icons.qr_code_scanner_rounded, size: 20, color: Theme.of(context).colorScheme.primary),
+              onPressed: onScanTap,
+            ),
             filled: true,
             fillColor: Theme.of(context).cardColor,
             contentPadding: EdgeInsets.zero,

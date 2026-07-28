@@ -15,6 +15,7 @@ import 'widgets/management_header.dart';
 import 'widgets/management_option_card.dart';
 import 'widgets/management_tabs.dart';
 import 'package:mpos/utils/custom_snackbar.dart';
+import 'package:mpos/screens/pos_screen/widgets/barcode_scanner_view.dart';
 
 const _statusOptions = [
   _FieldOption('true', 'Active'),
@@ -1758,6 +1759,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
                               )
                               .toList();
                           return _FormInput(
+                            fieldKey: field.key,
                             label: field.label,
                             controller: controllers[field.key]!,
                             keyboardType: field.keyboardType,
@@ -3717,6 +3719,7 @@ class _DetailRow extends StatelessWidget {
 }
 
 class _FormInput extends StatelessWidget {
+  final String fieldKey;
   final String label;
   final TextEditingController controller;
   final TextInputType keyboardType;
@@ -3724,6 +3727,7 @@ class _FormInput extends StatelessWidget {
   final List<_LookupOption> options;
 
   const _FormInput({
+    required this.fieldKey,
     required this.label,
     required this.controller,
     required this.keyboardType,
@@ -3773,6 +3777,22 @@ class _FormInput extends StatelessWidget {
         decoration: InputDecoration(
           labelText: required ? '$label *' : label,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+          suffixIcon: fieldKey == 'barcode'
+              ? IconButton(
+                  icon: const Icon(Icons.qr_code_scanner),
+                  onPressed: () async {
+                    final result = await Navigator.push<String>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const BarcodeScannerView(),
+                      ),
+                    );
+                    if (result != null) {
+                      controller.text = result;
+                    }
+                  },
+                )
+              : null,
         ),
       ),
     );

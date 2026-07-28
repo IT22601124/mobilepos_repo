@@ -3,12 +3,14 @@ import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:mpos/dio_client/dio_client.dart';
 import 'package:mpos/resources/api_routes.dart';
+import 'package:mpos/screens/pos_screen/widgets/barcode_scanner_view.dart';
 import 'package:mpos/screens/pos_screen/widgets/card_tems.dart';
 import 'package:mpos/screens/pos_screen/widgets/category_tabs.dart';
 import 'package:mpos/screens/pos_screen/widgets/payment_panel.dart';
 import 'package:mpos/screens/pos_screen/widgets/product_card.dart';
 import 'package:mpos/screens/pos_screen/widgets/searchbox.dart';
 import 'package:mpos/utils/app_back_scope.dart';
+import 'package:mpos/utils/custom_snackbar.dart';
 
 class PosTerminalScreen extends StatefulWidget {
   const PosTerminalScreen({super.key});
@@ -77,6 +79,41 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
     });
   }
 
+  Future<void> openScanner() async {
+    final String? scannedCode = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const BarcodeScannerView()),
+    );
+
+    if (scannedCode != null && scannedCode.isNotEmpty) {
+      final code = scannedCode.trim().toLowerCase();
+      final product = products.cast<Map<String, dynamic>?>().firstWhere(
+        (p) {
+          if (p == null) return false;
+          final sku = p['sku']?.toString().toLowerCase();
+          final barcode = p['barcode']?.toString().toLowerCase();
+          final pCode = p['product_code']?.toString().toLowerCase();
+          return sku == code || barcode == code || pCode == code;
+        },
+        orElse: () => null,
+      );
+
+      if (product != null) {
+        addToCart(product);
+        if (mounted) {
+          CustomSnackBar.success(context, 'Added ${product['name']} to cart');
+        }
+      } else {
+        setState(() {
+          query = scannedCode;
+        });
+        if (mounted) {
+          CustomSnackBar.warning(context, 'Product not found. SKU: $scannedCode');
+        }
+      }
+    }
+  }
+
   List<Map<String, dynamic>> get filteredProducts {
     Iterable<Map<String, dynamic>> result = products;
 
@@ -89,7 +126,12 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
       result = result.where((item) {
         final name = item['name'].toString().toLowerCase();
         final sku = item['sku'].toString().toLowerCase();
-        return name.contains(normalizedQuery) || sku.contains(normalizedQuery);
+        final barcode = item['barcode']?.toString().toLowerCase() ?? '';
+        final pCode = item['product_code']?.toString().toLowerCase() ?? '';
+        return name.contains(normalizedQuery) ||
+            sku.contains(normalizedQuery) ||
+            barcode.contains(normalizedQuery) ||
+            pCode.contains(normalizedQuery);
       });
     }
 
@@ -176,6 +218,8 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
       'sku':
           (item['product_code'] ?? item['sku'] ?? item['barcode'] ?? item['id'])
               .toString(),
+      'barcode': item['barcode']?.toString(),
+      'product_code': item['product_code']?.toString(),
       'price': _toDouble(item['selling_price'] ?? item['price']),
       'stock': _toDouble(item['stock_quantity'] ?? item['stock']).toInt(),
       'category': category is Map
@@ -365,6 +409,8 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
                   product?['barcode'] ??
                   productId)
               .toString(),
+      'barcode': product?['barcode']?.toString(),
+      'product_code': product?['product_code']?.toString(),
       'price': _toDouble(item['unit_price'] ?? product?['selling_price']),
       'stock': _toDouble(product?['stock_quantity']).toInt(),
       'category': category is Map
@@ -403,6 +449,7 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
                   query = value;
                 });
               },
+              onScanTap: openScanner,
             ),
             CategoryTabs(
               categories: categories,

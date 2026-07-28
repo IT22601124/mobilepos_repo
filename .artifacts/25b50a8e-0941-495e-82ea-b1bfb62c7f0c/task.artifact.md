@@ -1,0 +1,5 @@
+- [x] Implement "Quick Create Customer" in `pos_payment_screen.dart`
+    - [x] Update `_CreditBox` widget to include an "Add" button
+    - [x] Implement `_showCreateCustomerDialog` to collect customer data
+    - [x] Implement `_handleCreateCustomer` to call API and refresh list
+- [x] Verify with `flutter analyze`

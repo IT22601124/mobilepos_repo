@@ -1,0 +1,7 @@
+- [x] Update `pubspec.yaml` with printer and permission dependencies
+- [x] Update `AndroidManifest.xml` with Bluetooth, USB, and Location permissions
+- [x] Create `PrintingProvider` in `lib/provider/printing_provider.dart`
+- [x] Create `PrintingOptionsScreen` in `lib/screens/settings/printing_options_screen.dart`
+- [x] Enable `/printing-options` route in `lib/route_checker/router_chekcer.dart`
+- [x] Register `PrintingProvider` in `lib/main.dart`
+- [x] Verify implementation with a mock or UI check

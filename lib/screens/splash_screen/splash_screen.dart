@@ -27,7 +27,7 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
   String _statusText = 'Initializing security node...';
   Timer? _progressTimer;
   String? errorMessage;
-  static const _onboardingKey = 'has_completed_onboarding';
+  static const _onboardingKey = 'isonboardingscreendispaleyd';
 
   @override
   void initState() {
