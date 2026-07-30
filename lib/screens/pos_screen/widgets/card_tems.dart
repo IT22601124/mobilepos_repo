@@ -20,6 +20,8 @@ class CartItem extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final lineTotal = item['price'] * item['qty'];
+    final isWeighted = item['is_weighted'] == true;
+    final unitName = item['unit_name']?.toString() ?? (isWeighted ? 'kg' : 'pcs');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -77,7 +79,7 @@ class CartItem extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Text(
-                      '${item['qty']}',
+                      isWeighted ? item['qty'].toStringAsFixed(3) : '${item['qty'].toInt()}',
                       style: const TextStyle(fontWeight: FontWeight.w900),
                     ),
                   ),
@@ -85,6 +87,11 @@ class CartItem extends StatelessWidget {
                 ],
               ),
             ),
+            if (isWeighted)
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Text(unitName, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.primary)),
+              ),
             const SizedBox(width: 12),
             SizedBox(
               width: 70,

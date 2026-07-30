@@ -17,7 +17,10 @@ class PrintingProvider with ChangeNotifier {
   BluetoothPrinter? _selectedBluetoothPrinter;
   UsbPrinter? _selectedUsbPrinter;
   PrinterConnectionType _connectionType = PrinterConnectionType.bluetooth;
-  PaperSize _paperSize = PaperSize.mm80;
+  
+  // Custom Paper Width in mm
+  int _paperWidthMm = 80;
+  
   bool _autoPrint = false;
   
   List<BluetoothPrinter> get bluetoothDevices => _bluetoothDevices;
@@ -25,7 +28,15 @@ class PrintingProvider with ChangeNotifier {
   bool get isScanning => _isScanning;
   bool get isConnected => _isConnected;
   PrinterConnectionType get connectionType => _connectionType;
-  PaperSize get paperSize => _paperSize;
+  
+  // Expose both raw width and the PaperSize object for the generator
+  int get paperWidthMm => _paperWidthMm;
+  PaperSize get paperSize {
+    if (_paperWidthMm <= 58) return PaperSize.mm58;
+    if (_paperWidthMm <= 72) return PaperSize.mm72;
+    return PaperSize.mm80;
+  }
+  
   bool get autoPrint => _autoPrint;
   
   BluetoothPrinter? get selectedBluetoothPrinter => _selectedBluetoothPrinter;
@@ -40,8 +51,7 @@ class PrintingProvider with ChangeNotifier {
     final typeIndex = prefs.getInt('printer_type') ?? 0;
     _connectionType = PrinterConnectionType.values[typeIndex];
     
-    final paperIndex = prefs.getInt('paper_size') ?? 1; // Default to 80mm
-    _paperSize = paperIndex == 0 ? PaperSize.mm58 : PaperSize.mm80;
+    _paperWidthMm = prefs.getInt('paper_width_mm') ?? 80;
     
     _autoPrint = prefs.getBool('auto_print') ?? false;
     
@@ -56,12 +66,19 @@ class PrintingProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void setPaperSize(PaperSize size) {
-    _paperSize = size;
+  void setPaperWidth(int widthMm) {
+    _paperWidthMm = widthMm;
     SharedPreferences.getInstance().then((prefs) {
-      prefs.setInt('paper_size', size == PaperSize.mm58 ? 0 : 1);
+      prefs.setInt('paper_width_mm', widthMm);
     });
     notifyListeners();
+  }
+
+  // Deprecated - kept for compatibility if needed elsewhere
+  void setPaperSize(PaperSize size) {
+    if (size == PaperSize.mm58) setPaperWidth(58);
+    if (size == PaperSize.mm72) setPaperWidth(72);
+    if (size == PaperSize.mm80) setPaperWidth(80);
   }
 
   void setConnectionType(PrinterConnectionType type) {
@@ -162,12 +179,18 @@ class PrintingProvider with ChangeNotifier {
     if (!_isConnected) return;
 
     final profile = await CapabilityProfile.load();
-    final generator = Generator(_paperSize, profile);
+    final generator = Generator(paperSize, profile);
     List<int> bytes = [];
 
     bytes += generator.text('NOVA POS TEST PRINT',
-        styles: const PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2));
+        styles:  PosStyles(
+          align: PosAlign.center, 
+          bold: true, 
+          height: _paperWidthMm < 44 ? PosTextSize.size1 : PosTextSize.size2, 
+          width: _paperWidthMm < 44 ? PosTextSize.size1 : PosTextSize.size2
+        ));
     bytes += generator.feed(1);
+    bytes += generator.text('Width: ${_paperWidthMm}mm', styles: const PosStyles(align: PosAlign.center));
     bytes += generator.text('Connection: ${_connectionType.name.toUpperCase()}', styles: const PosStyles(align: PosAlign.center));
     bytes += generator.text('Date: ${DateTime.now().toString().substring(0, 19)}', styles: const PosStyles(align: PosAlign.center));
     bytes += generator.feed(2);

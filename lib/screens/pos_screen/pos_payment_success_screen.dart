@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/services.dart';
 import 'package:mpos/provider/printing_provider.dart';
 import 'package:mpos/utils/app_back_scope.dart';
 import 'package:pdf/pdf.dart';
@@ -8,6 +9,8 @@ import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platform_image_3.dart';
+import 'package:image/image.dart' as img;
+import 'package:dio/dio.dart';
 
 class PosPaymentSuccessScreen extends StatefulWidget {
   final String saleNo;
@@ -15,6 +18,7 @@ class PosPaymentSuccessScreen extends StatefulWidget {
   final double subtotal;
   final double discount;
   final double tax;
+  final double taxRate;
   final double total;
   final double paid;
   final double change;
@@ -22,6 +26,8 @@ class PosPaymentSuccessScreen extends StatefulWidget {
   final String customerName;
   final List<Map<String, dynamic>> cart;
   final String storeName;
+  final String storeAddress;
+  final String storePhone;
   final String receiptFooter;
   final String currencyCode;
   final String logoUrl;
@@ -33,6 +39,7 @@ class PosPaymentSuccessScreen extends StatefulWidget {
     required this.subtotal,
     required this.discount,
     required this.tax,
+    required this.taxRate,
     required this.total,
     required this.paid,
     required this.change,
@@ -40,6 +47,8 @@ class PosPaymentSuccessScreen extends StatefulWidget {
     required this.customerName,
     required this.cart,
     required this.storeName,
+    required this.storeAddress,
+    required this.storePhone,
     required this.receiptFooter,
     required this.currencyCode,
     required this.logoUrl,
@@ -67,99 +76,155 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
 
   String money(double value) => '${widget.currencyCode} ${value.toStringAsFixed(0)}';
 
+  double _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  Future<Uint8List?> _fetchLogoBytes(String url) async {
+    if (url.isEmpty) return null;
+    try {
+      final response = await Dio().get<List<int>>(
+        url,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      if (response.data != null) {
+        return Uint8List.fromList(response.data!);
+      }
+    } catch (e) {
+      debugPrint('Error fetching logo: $e');
+    }
+    return null;
+  }
+
   Future<void> printReceipt(BuildContext context) async {
     final printingProvider = context.read<PrintingProvider>();
+    final logoBytes = await _fetchLogoBytes(widget.logoUrl);
 
     if (printingProvider.isConnected) {
       // Print directly to the thermal printer
-      await _printToThermalPrinter(printingProvider);
+      await _printToThermalPrinter(printingProvider, logoBytes);
     } else {
       // Fallback to system print dialog (PDF)
       await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => _buildReceiptPdf().save(),
+        onLayout: (PdfPageFormat format) async => _buildReceiptPdf(logoBytes).save(),
       );
     }
   }
 
-  Future<void> _printToThermalPrinter(PrintingProvider provider) async {
+  Future<void> _printToThermalPrinter(PrintingProvider provider, Uint8List? logoBytes) async {
     final profile = await CapabilityProfile.load();
     final generator = Generator(provider.paperSize, profile);
+    final width = provider.paperWidthMm;
+    final isTiny = width < 44;
+    
     List<int> bytes = [];
+
+    // Logo
+    if (logoBytes != null) {
+      try {
+        final img.Image? image = img.decodeImage(logoBytes);
+        if (image != null) {
+          // Resize image to fit paper width
+          // 80mm is usually 576 dots, 58mm is 384 dots
+          int targetWidth = provider.paperSize == PaperSize.mm80 ? 400 : 200;
+          if (isTiny) targetWidth = 150;
+          
+          final resizedImage = img.copyResize(image, width: targetWidth);
+          bytes += generator.image(resizedImage);
+          bytes += generator.feed(1);
+        }
+      } catch (e) {
+        debugPrint('Error processing logo for thermal printer: $e');
+      }
+    }
 
     // Header
     bytes += generator.text(widget.storeName,
-        styles: const PosStyles(
+        styles: PosStyles(
           align: PosAlign.center,
           bold: true,
-          height: PosTextSize.size2,
-          width: PosTextSize.size2,
+          height: isTiny ? PosTextSize.size1 : PosTextSize.size2,
+          width: isTiny ? PosTextSize.size1 : PosTextSize.size2,
         ));
     bytes += generator.text('Sales Receipt',
         styles: const PosStyles(align: PosAlign.center));
     bytes += generator.feed(1);
 
     // Info
-    bytes += generator.text('Sale No: ${widget.saleNo}');
-    bytes += generator.text('Customer: ${widget.customerName}');
-    bytes += generator.text('Payment: ${widget.paymentMethod}');
+    bytes += generator.text('Sale: ${widget.saleNo}');
+    if (!isTiny) {
+      bytes += generator.text('Customer: ${widget.customerName}');
+      bytes += generator.text('Payment: ${widget.paymentMethod}');
+    }
     bytes += generator.text('Date: ${DateTime.now().toString().substring(0, 16)}');
     bytes += generator.hr();
 
     // Items
     for (var item in widget.cart) {
-      final qty = item['qty'] as int;
-      final price = item['price'] as double;
+      final qty = _toDouble(item['qty']);
+      final price = _toDouble(item['price']);
       final lineTotal = qty * price;
+      final isWeighted = item['is_weighted'] == true;
+      final unitName = item['unit_name']?.toString() ?? (isWeighted ? 'kg' : 'pcs');
+      final qtyText = isWeighted ? qty.toStringAsFixed(3) : qty.toInt().toString();
 
       bytes += generator.text(item['name'].toString(),
           styles: const PosStyles(bold: true));
-      bytes += generator.row([
-        PosColumn(text: '$qty x ${money(price)}', width: 7),
-        PosColumn(
-            text: money(lineTotal),
-            width: 5,
-            styles: const PosStyles(align: PosAlign.right)),
-      ]);
+      
+      if (isTiny) {
+        bytes += generator.text('$qtyText $unitName x ${money(price)}');
+        bytes += generator.text(money(lineTotal), styles: const PosStyles(align: PosAlign.right));
+      } else {
+        bytes += generator.row([
+          PosColumn(text: '$qtyText $unitName x ${money(price)}', width: 7),
+          PosColumn(
+              text: money(lineTotal),
+              width: 5,
+              styles: const PosStyles(align: PosAlign.right)),
+        ]);
+      }
     }
 
     bytes += generator.hr();
 
     // Summary
-    bytes += generator.row([
-      PosColumn(text: 'Subtotal', width: 7),
-      PosColumn(
-          text: money(widget.subtotal),
-          width: 5,
-          styles: const PosStyles(align: PosAlign.right)),
-    ]);
-    bytes += generator.row([
-      PosColumn(text: 'Discount', width: 7),
-      PosColumn(
-          text: money(widget.discount),
-          width: 5,
-          styles: const PosStyles(align: PosAlign.right)),
-    ]);
-    bytes += generator.row([
-      PosColumn(text: 'Tax', width: 7),
-      PosColumn(
-          text: money(widget.tax),
-          width: 5,
-          styles: const PosStyles(align: PosAlign.right)),
-    ]);
+    void addRow(String label, double value, {bool bold = false}) {
+      if (isTiny) {
+        bytes += generator.text('$label: ${money(value)}', styles: PosStyles(align: PosAlign.right, bold: bold));
+      } else {
+        bytes += generator.row([
+          PosColumn(text: label, width: 7, styles: PosStyles(bold: bold)),
+          PosColumn(
+              text: money(value),
+              width: 5,
+              styles: PosStyles(align: PosAlign.right, bold: bold)),
+        ]);
+      }
+    }
+
+    addRow('Subtotal', widget.subtotal);
+    addRow('Discount', widget.discount);
+    addRow('Tax ${widget.taxRate.toStringAsFixed(0)}%', widget.tax);
     
     bytes += generator.hr();
     
-    bytes += generator.row([
-      PosColumn(
-          text: 'TOTAL',
-          width: 7,
-          styles: const PosStyles(bold: true, height: PosTextSize.size2)),
-      PosColumn(
-          text: money(widget.total),
-          width: 5,
-          styles: const PosStyles(
-              align: PosAlign.right, bold: true, height: PosTextSize.size2)),
-    ]);
+    if (isTiny) {
+      bytes += generator.text('TOTAL: ${money(widget.total)}', 
+          styles: const PosStyles(align: PosAlign.right, bold: true));
+    } else {
+      bytes += generator.row([
+        PosColumn(
+            text: 'TOTAL',
+            width: 7,
+            styles: const PosStyles(bold: true, height: PosTextSize.size2)),
+        PosColumn(
+            text: money(widget.total),
+            width: 5,
+            styles: const PosStyles(
+                align: PosAlign.right, bold: true, height: PosTextSize.size2)),
+      ]);
+    }
 
     bytes += generator.feed(1);
     bytes += generator.text('Paid: ${money(widget.paid)}',
@@ -169,13 +234,18 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
       bytes += generator.text('Change: ${money(widget.change)}',
           styles: const PosStyles(align: PosAlign.right));
     }
-    
-    if (widget.paymentMethod == 'Credit') {
-      bytes += generator.text('Credit: ${money(widget.creditAmount)}',
-          styles: const PosStyles(align: PosAlign.right));
-    }
 
-    bytes += generator.feed(2);
+    bytes += generator.feed(1);
+    if (widget.storeAddress.isNotEmpty) {
+      bytes += generator.text(widget.storeAddress,
+          styles: const PosStyles(align: PosAlign.center));
+    }
+    if (widget.storePhone.isNotEmpty) {
+      bytes += generator.text('Phone: ${widget.storePhone}',
+          styles: const PosStyles(align: PosAlign.center));
+    }
+    
+    bytes += generator.feed(1);
     bytes += generator.text(widget.receiptFooter,
         styles: const PosStyles(align: PosAlign.center));
     bytes += generator.feed(3);
@@ -189,68 +259,103 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
   }
 
   Future<void> sharePdfReceipt() async {
-    final pdfBytes = await _buildReceiptPdf().save();
+    final logoBytes = await _fetchLogoBytes(widget.logoUrl);
+    final pdfBytes = await _buildReceiptPdf(logoBytes).save();
 
     await Printing.sharePdf(bytes: pdfBytes, filename: '${widget.saleNo}-receipt.pdf');
   }
 
-  pw.Document _buildReceiptPdf() {
+  pw.Document _buildReceiptPdf(Uint8List? logoBytes) {
     final pdf = pw.Document();
+    final provider = context.read<PrintingProvider>();
+    final widthMm = provider.paperWidthMm;
+    final isTiny = widthMm < 44;
+
+    PdfPageFormat format;
+    if (widthMm == 30) {
+      format = PdfPageFormat(30 * PdfPageFormat.mm, double.infinity, marginAll: 2 * PdfPageFormat.mm);
+    } else if (widthMm == 44) {
+      format = PdfPageFormat(44 * PdfPageFormat.mm, double.infinity, marginAll: 3 * PdfPageFormat.mm);
+    } else if (widthMm == 57) {
+      format = PdfPageFormat.roll57;
+    } else if (widthMm == 58) {
+      format = PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, marginAll: 5 * PdfPageFormat.mm);
+    } else if (widthMm == 72) {
+      format = PdfPageFormat(72 * PdfPageFormat.mm, double.infinity, marginAll: 5 * PdfPageFormat.mm);
+    } else {
+      format = PdfPageFormat.roll80;
+    }
 
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.roll80,
-        build: (context) {
+        pageFormat: format,
+        build: (pw.Context context) {
+          final double fontSize = isTiny ? 7 : 9;
+          final double headerSize = isTiny ? 10 : 14;
+
           return pw.Padding(
-            padding: const pw.EdgeInsets.all(12),
+            padding: const pw.EdgeInsets.all(4),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
+                if (logoBytes != null)
+                  pw.Center(
+                    child: pw.Container(
+                      margin: const pw.EdgeInsets.only(bottom: 5),
+                      height: isTiny ? 30 : 50,
+                      child: pw.Image(pw.MemoryImage(logoBytes)),
+                    ),
+                  ),
                 pw.Center(
                   child: pw.Text(
                     widget.storeName,
                     style: pw.TextStyle(
-                      fontSize: 18,
+                      fontSize: headerSize,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
                 ),
-                pw.Center(child: pw.Text('Sales Receipt')),
-                pw.SizedBox(height: 10),
-                _pdfRow('Sale No', widget.saleNo),
-                _pdfRow('Customer', widget.customerName),
-                _pdfRow('Payment', widget.paymentMethod),
-                _pdfRow('Date', DateTime.now().toString().substring(0, 16)),
-                pw.Divider(),
+                pw.Center(child: pw.Text('Sales Receipt', style: pw.TextStyle(fontSize: fontSize))),
+                pw.SizedBox(height: 6),
+                _pdfRow('Sale No', widget.saleNo, fontSize: fontSize),
+                if (!isTiny) _pdfRow('Customer', widget.customerName, fontSize: fontSize),
+                _pdfRow('Date', DateTime.now().toString().substring(0, 16), fontSize: fontSize),
+                pw.Divider(thickness: 0.5),
 
                 ...widget.cart.map((item) {
                   final name = item['name'].toString();
-                  final qty = item['qty'] as int;
-                  final price = item['price'] as double;
+                  final qty = _toDouble(item['qty']);
+                  final price = _toDouble(item['price']);
                   final lineTotal = qty * price;
+                  final isWeighted = item['is_weighted'] == true;
+                  final unitName = item['unit_name']?.toString() ?? (isWeighted ? 'kg' : 'pcs');
+                  final qtyText = isWeighted ? qty.toStringAsFixed(3) : qty.toInt().toString();
 
                   return pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text(name),
-                      _pdfRow('$qty x ${money(price)}', money(lineTotal)),
-                      pw.SizedBox(height: 4),
+                      pw.Text(name, style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold)),
+                      _pdfRow('$qtyText $unitName x ${money(price)}', money(lineTotal), fontSize: fontSize),
+                      pw.SizedBox(height: 2),
                     ],
                   );
                 }),
 
-                pw.Divider(),
-                _pdfRow('Subtotal', money(widget.subtotal)),
-                _pdfRow('Discount', money(widget.discount)),
-                _pdfRow('Tax 8%', money(widget.tax)),
-                pw.Divider(),
-                _pdfRow('Total', money(widget.total), bold: true),
-                _pdfRow('Paid', money(widget.paid)),
-                if (widget.paymentMethod == 'Cash') _pdfRow('Change', money(widget.change)),
-                if (widget.paymentMethod == 'Credit')
-                  _pdfRow('Credit', money(widget.creditAmount)),
-                pw.SizedBox(height: 14),
-                pw.Center(child: pw.Text(widget.receiptFooter)),
+                pw.Divider(thickness: 0.5),
+                _pdfRow('Subtotal', money(widget.subtotal), fontSize: fontSize),
+                _pdfRow('Discount', money(widget.discount), fontSize: fontSize),
+                _pdfRow('Tax ${widget.taxRate.toStringAsFixed(0)}%', money(widget.tax), fontSize: fontSize),
+                pw.Divider(thickness: 0.5),
+                _pdfRow('Total', money(widget.total), bold: true, fontSize: isTiny ? fontSize : fontSize + 2),
+                _pdfRow('Paid', money(widget.paid), fontSize: fontSize),
+                if (widget.paymentMethod == 'Cash') _pdfRow('Change', money(widget.change), fontSize: fontSize),
+                pw.SizedBox(height: 8),
+                if (widget.storeAddress.isNotEmpty)
+                  pw.Center(child: pw.Text(widget.storeAddress, style: pw.TextStyle(fontSize: fontSize - 1))),
+                if (widget.storePhone.isNotEmpty)
+                  pw.Center(child: pw.Text('Phone: ${widget.storePhone}', style: pw.TextStyle(fontSize: fontSize - 1))),
+                pw.SizedBox(height: 4),
+                pw.Center(child: pw.Text(widget.receiptFooter, style: pw.TextStyle(fontSize: fontSize - 1))),
               ],
             ),
           );
@@ -261,17 +366,23 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
     return pdf;
   }
 
-  pw.Widget _pdfRow(String label, String value, {bool bold = false}) {
+  pw.Widget _pdfRow(String label, String value, {bool bold = false, double fontSize = 9}) {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
         pw.Text(
           label,
-          style: bold ? pw.TextStyle(fontWeight: pw.FontWeight.bold) : null,
+          style: pw.TextStyle(
+            fontSize: fontSize,
+            fontWeight: bold ? pw.FontWeight.bold : null,
+          ),
         ),
         pw.Text(
           value,
-          style: bold ? pw.TextStyle(fontWeight: pw.FontWeight.bold) : null,
+          style: pw.TextStyle(
+            fontSize: fontSize,
+            fontWeight: bold ? pw.FontWeight.bold : null,
+          ),
         ),
       ],
     );
@@ -347,12 +458,15 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
               paymentMethod: widget.paymentMethod,
               customerName: widget.customerName,
               storeName: widget.storeName,
+              storeAddress: widget.storeAddress,
+              storePhone: widget.storePhone,
               receiptFooter: widget.receiptFooter,
               currencyCode: widget.currencyCode,
               logoUrl: widget.logoUrl,
               subtotal: widget.subtotal,
               discount: widget.discount,
               tax: widget.tax,
+              taxRate: widget.taxRate,
               total: widget.total,
               paid: widget.paid,
               change: widget.change,
@@ -433,12 +547,15 @@ class _ReceiptCard extends StatelessWidget {
   final String paymentMethod;
   final String customerName;
   final String storeName;
+  final String storeAddress;
+  final String storePhone;
   final String receiptFooter;
   final String currencyCode;
   final String logoUrl;
   final double subtotal;
   final double discount;
   final double tax;
+  final double taxRate;
   final double total;
   final double paid;
   final double change;
@@ -450,12 +567,15 @@ class _ReceiptCard extends StatelessWidget {
     required this.paymentMethod,
     required this.customerName,
     required this.storeName,
+    required this.storeAddress,
+    required this.storePhone,
     required this.receiptFooter,
     required this.currencyCode,
     required this.logoUrl,
     required this.subtotal,
     required this.discount,
     required this.tax,
+    required this.taxRate,
     required this.total,
     required this.paid,
     required this.change,
@@ -464,6 +584,11 @@ class _ReceiptCard extends StatelessWidget {
   });
 
   String money(double value) => '$currencyCode ${value.toStringAsFixed(0)}';
+
+  double _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -511,12 +636,15 @@ class _ReceiptCard extends StatelessWidget {
           const Divider(),
 
           ...cart.map((item) {
-            final qty = item['qty'] as int;
-            final price = item['price'] as double;
+            final qty = _toDouble(item['qty']);
+            final price = _toDouble(item['price']);
             final lineTotal = qty * price;
+            final isWeighted = item['is_weighted'] == true;
+            final unitName = item['unit_name']?.toString() ?? (isWeighted ? 'kg' : 'pcs');
+            final qtyText = isWeighted ? qty.toStringAsFixed(3) : qty.toInt().toString();
 
             return _InfoRow(
-              label: '${item['name']} x $qty',
+              label: '${item['name']} ($qtyText $unitName)',
               value: money(lineTotal),
             );
           }),
@@ -524,7 +652,7 @@ class _ReceiptCard extends StatelessWidget {
           const Divider(),
           _InfoRow(label: 'Subtotal', value: money(subtotal)),
           _InfoRow(label: 'Discount', value: money(discount)),
-          _InfoRow(label: 'Tax 8%', value: money(tax)),
+          _InfoRow(label: 'Tax ${taxRate.toStringAsFixed(0)}%', value: money(tax)),
           _InfoRow(label: 'Total', value: money(total), strong: true),
           _InfoRow(label: 'Paid', value: money(paid)),
           if (paymentMethod == 'Cash')
@@ -532,6 +660,29 @@ class _ReceiptCard extends StatelessWidget {
           if (paymentMethod == 'Credit')
             _InfoRow(label: 'Credit', value: money(creditAmount)),
           const Divider(),
+          if (storeAddress.isNotEmpty)
+            Center(
+              child: Text(
+                storeAddress,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(context).hintColor,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          if (storePhone.isNotEmpty)
+            Center(
+              child: Text(
+                'Phone: $storePhone',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(context).hintColor,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          const SizedBox(height: 4),
           Center(
             child: Text(
               receiptFooter,

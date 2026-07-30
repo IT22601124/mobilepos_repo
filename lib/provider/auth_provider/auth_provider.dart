@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:mpos/dio_client/dio_client.dart';
 import 'package:mpos/model/user_model.dart';
@@ -47,6 +48,8 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> login(String mobile, String password) async {
     try {
       _isLoading = true;
+      notifyListeners();
+      
       final response = await _dioClient.post(
         ApiRoutes.login,
         data: {'phone': mobile, 'password': password},
@@ -70,6 +73,28 @@ class AuthProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
+      if (e is DioException) {
+        if (e.type == DioExceptionType.connectionTimeout || 
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.sendTimeout ||
+            e.type == DioExceptionType.connectionError) {
+          throw 'Network error. Please check your internet connection.';
+        }
+        
+        if (e.response?.statusCode == 401) {
+          throw 'Incorrect phone number or password.';
+        }
+
+        if (e.response?.statusCode == 404) {
+          throw 'User account not found.';
+        }
+        
+        final responseData = e.response?.data;
+        if (responseData is Map && responseData['message'] != null) {
+          throw responseData['message'].toString();
+        }
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final demoPhone = prefs.getString('demo_user_phone');
       final demoPassword = prefs.getString('demo_user_password');
@@ -85,7 +110,7 @@ class AuthProvider extends ChangeNotifier {
         return true;
       }
 
-      throw Exception('Invalid credentials. Demo login: 0777123456 / 123456');
+      throw 'Invalid credentials. Demo login: 0777123456 / 123456';
     } finally {
       _isLoading = false;
       notifyListeners();

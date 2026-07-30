@@ -65,6 +65,8 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
   }
 
   Widget _buildPaperSizeSection(PrintingProvider provider, ThemeData theme) {
+    final sizes = [30, 44, 57, 58, 72, 80];
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -78,28 +80,19 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
           children: [
             const Text('Paper Size', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Center(child: Text('58mm')),
-                    selected: provider.paperSize == PaperSize.mm58,
-                    onSelected: (selected) {
-                      if (selected) provider.setPaperSize(PaperSize.mm58);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Center(child: Text('80mm')),
-                    selected: provider.paperSize == PaperSize.mm80,
-                    onSelected: (selected) {
-                      if (selected) provider.setPaperSize(PaperSize.mm80);
-                    },
-                  ),
-                ),
-              ],
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: sizes.map((width) {
+                final isSelected = provider.paperWidthMm == width;
+                return ChoiceChip(
+                  label: Text('${width}mm'),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (selected) provider.setPaperWidth(width);
+                  },
+                );
+              }).toList(),
             ),
           ],
         ),

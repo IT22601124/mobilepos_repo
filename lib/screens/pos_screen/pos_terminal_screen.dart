@@ -9,6 +9,7 @@ import 'package:mpos/screens/pos_screen/widgets/category_tabs.dart';
 import 'package:mpos/screens/pos_screen/widgets/payment_panel.dart';
 import 'package:mpos/screens/pos_screen/widgets/product_card.dart';
 import 'package:mpos/screens/pos_screen/widgets/searchbox.dart';
+import 'package:mpos/screens/pos_screen/widgets/weight_input_dialog.dart';
 import 'package:mpos/utils/app_back_scope.dart';
 import 'package:mpos/utils/custom_snackbar.dart';
 
@@ -21,6 +22,8 @@ class PosTerminalScreen extends StatefulWidget {
 
 class _PosTerminalScreenState extends State<PosTerminalScreen> {
   final _dio = DioClient().dio;
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
 
   late List<Map<String, dynamic>> products = [];
   final List<Map<String, dynamic>> cart = [];
@@ -29,6 +32,7 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
   String paymentMethod = 'Cash';
   String query = '';
   double discount = 0;
+  double taxRate = 0;
   bool isLoading = true;
   String? error;
 
@@ -38,6 +42,13 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
   void initState() {
     super.initState();
     _loadCatalog();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
   }
 
   double get subtotal {
@@ -50,26 +61,77 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
   double get discountAmount => discount.clamp(0, subtotal).toDouble();
 
   double get tax {
-    return (subtotal - discountAmount) * 0.08;
+    return (subtotal - discountAmount) * (taxRate / 100);
   }
 
   double get total {
     return subtotal - discountAmount + tax;
   }
 
-  void addToCart(Map<String, dynamic> product) {
+  Future<void> addToCart(Map<String, dynamic> product) async {
+    final isWeighted = product['is_weighted'] == true;
     final index = cart.indexWhere((item) => item['sku'] == product['sku']);
+    final stock = _toDouble(product['stock']);
+    final currentQty = index >= 0 ? _toDouble(cart[index]['qty']) : 0.0;
+
+    if (isWeighted) {
+      final double? weight = await showDialog<double>(
+        context: context,
+        builder: (context) => WeightInputDialog(
+          productName: product['name'],
+          unitName: product['unit_name'] ?? 'kg',
+          currentWeight: currentQty,
+          stockAvailable: stock,
+        ),
+      );
+
+      if (weight != null && weight > 0) {
+        setState(() {
+          if (index >= 0) {
+            cart[index]['qty'] = weight;
+          } else {
+            cart.add({...product, 'qty': weight});
+          }
+        });
+      }
+      return;
+    }
+
+    if (currentQty >= stock) {
+      CustomSnackBar.warning(context, 'Only ${stock.toInt()} items available in stock.');
+      return;
+    }
 
     setState(() {
       if (index >= 0) {
-        cart[index]['qty'] += 1;
+        cart[index]['qty'] += 1.0;
       } else {
-        cart.add({...product, 'qty': 1});
+        cart.add({...product, 'qty': 1.0});
       }
     });
   }
 
-  void updateQty(int index, int qty) {
+  void updateQty(int index, dynamic qtyInput) {
+    final double qty = _toDouble(qtyInput);
+    final item = cart[index];
+    final isWeighted = item['is_weighted'] == true;
+
+    if (qty > 0) {
+      final stock = _toDouble(item['stock']);
+      if (qty > stock) {
+        CustomSnackBar.warning(context, 'Only $stock items available in stock.');
+        return;
+      }
+    }
+
+    if (isWeighted && qty > 0) {
+      // For weighted items, clicking +/- should ideally show the dialog again
+      // or we can just increment/decrement by a small amount like 0.1?
+      // Let's show the dialog for precision.
+      addToCart(item);
+      return;
+    }
+
     setState(() {
       if (qty <= 0) {
         cart.removeAt(index);
@@ -152,10 +214,15 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
       final responses = await Future.wait([
         _dio.get(ApiRoutes.products),
         _dio.get(ApiRoutes.categories),
+        _dio.get(ApiRoutes.posSettings),
       ]);
 
       final productRows = _extractRows(responses[0].data);
       final categoryRows = _extractRows(responses[1].data);
+      
+      final settingsData = _asMap(responses[2].data);
+      final fetchedTaxRate = _toDouble(settingsData['default_tax_percent']);
+
       final loadedProducts = productRows.map(_productFromApi).toList();
       final loadedCategories = categoryRows
           .map((item) => item['name']?.toString() ?? '')
@@ -165,6 +232,7 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
 
       setState(() {
         products = loadedProducts;
+        taxRate = fetchedTaxRate;
         categories = ['All', ...loadedCategories];
         if (!categories.contains(selectedCategory)) selectedCategory = 'All';
       });
@@ -210,8 +278,15 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
     return [];
   }
 
+  Map<String, dynamic> _asMap(dynamic payload) {
+    if (payload is Map<String, dynamic>) return payload;
+    if (payload is Map) return Map<String, dynamic>.from(payload);
+    return {};
+  }
+
   Map<String, dynamic> _productFromApi(Map<String, dynamic> item) {
     final category = item['category'];
+    final unit = item['unit'];
     return {
       'id': item['id'],
       'name': item['name']?.toString() ?? 'Unnamed product',
@@ -221,10 +296,14 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
       'barcode': item['barcode']?.toString(),
       'product_code': item['product_code']?.toString(),
       'price': _toDouble(item['selling_price'] ?? item['price']),
-      'stock': _toDouble(item['stock_quantity'] ?? item['stock']).toInt(),
+      'stock': _toDouble(item['stock_quantity'] ?? item['stock']),
       'category': category is Map
           ? category['name']?.toString() ?? 'Uncategorized'
           : item['category_name']?.toString() ?? 'Uncategorized',
+      'unit_name': unit is Map
+          ? unit['short_name'] ?? unit['name']
+          : item['unit_short_name'] ?? item['unit_name'],
+      'is_weighted': item['is_weighted'] == true || item['is_weighted'] == 1,
       'tax_rate': _toDouble(item['tax_rate']),
       'discount_rate': _toDouble(item['discount_rate']),
     };
@@ -243,6 +322,7 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
         'subtotal': subtotal,
         'discount': discountAmount,
         'tax': tax,
+        'taxRate': taxRate,
         'total': total,
         'paymentMethod': paymentMethod,
         'cart': List<Map<String, dynamic>>.from(cart),
@@ -280,6 +360,7 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
       'subtotal': subtotal,
       'discount_total': discountAmount,
       'tax_total': tax,
+      'tax_rate': taxRate,
       'grand_total': total,
       'paid_amount': 0,
       'balance_amount': total,
@@ -306,6 +387,7 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
     return {
       'product_id': item['id'],
       'qty': qty,
+      'quantity': qty,
       'unit_price': unitPrice,
       'discount': itemDiscount,
       'tax': itemTax,
@@ -430,10 +512,10 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
         appBar: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: _TerminalHeader(
-            cartCount: cart.fold<int>(
+            cartCount: cart.fold<double>(
               0,
-              (sum, item) => sum + ((item['qty'] as num?)?.toInt() ?? 0),
-            ),
+              (sum, item) => sum + ((item['qty'] as num?)?.toDouble() ?? 0),
+            ).toInt(),
             total: money(total),
             isLoading: isLoading,
             onRefresh: _loadCatalog,
@@ -444,6 +526,16 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
         body: Column(
           children: [
             SearchBox(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              suggestions: products,
+              onSuggestionSelected: (product) {
+                addToCart(product);
+                _searchController.clear();
+                setState(() {
+                  query = '';
+                });
+              },
               onChanged: (value) {
                 setState(() {
                   query = value;
@@ -473,19 +565,6 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
                       child: Center(child: CircularProgressIndicator(strokeWidth: 3)),
                     ),
                   _SectionHeader(
-                    title: 'Products',
-                    subtitle: '${filteredProducts.length} items',
-                  ),
-                  const SizedBox(height: 10),
-                  ...filteredProducts.map(
-                    (product) => ProductCard(
-                      product: product,
-                      onTap: () => addToCart(product),
-                    ),
-                  ),
-                  if (filteredProducts.isEmpty && !isLoading) const _NoProductsFound(),
-                  const SizedBox(height: 20),
-                  _SectionHeader(
                     title: 'Current Cart',
                     subtitle: '${cart.length} unique',
                   ),
@@ -503,6 +582,28 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
                         onRemove: () => updateQty(entry.key, 0),
                       ),
                     ),
+                  const SizedBox(height: 20),
+                  _SectionHeader(
+                    title: 'Products',
+                    subtitle: '${filteredProducts.length} items',
+                  ),
+                  const SizedBox(height: 10),
+                  ...filteredProducts.map(
+                    (product) {
+                      final cartItem = cart.firstWhere(
+                        (item) => item['sku'] == product['sku'],
+                        orElse: () => {},
+                      );
+                      final cartQty = (cartItem['qty'] as num?)?.toDouble() ?? 0.0;
+
+                      return ProductCard(
+                        product: product,
+                        cartQty: cartQty,
+                        onTap: () => addToCart(product),
+                      );
+                    },
+                  ),
+                  if (filteredProducts.isEmpty && !isLoading) const _NoProductsFound(),
                   const SizedBox(height: 20),
                 ],
               ),

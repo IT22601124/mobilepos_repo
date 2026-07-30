@@ -1,30 +1,41 @@
-# Implementation Plan - Expanded Paper Size Support
+# Implementation Plan - Expanded Paper Size Support (including Ultra-Small)
 
-The user wants to support more paper sizes for printing. I will expand the current support (58mm/80mm) to include 72mm and ensure the UI allows for easy selection between these standard sizes.
+This plan adds support for a wide range of paper sizes, including ultra-small sizes like **30mm** and **44mm**, to ensure compatibility with specialized handheld and mobile thermal printers.
 
 ## Proposed Changes
 
 ### State Management
 
 #### [MODIFY] [printing_provider.dart](file:///F:/mpos/lib/provider/printing_provider.dart)
-- Update `_loadSettings` to correctly handle `PaperSize` values (1, 2, 3) from `SharedPreferences`.
-- Update `setPaperSize` to persist the specific `PaperSize` value.
-- Ensure `testPrint` uses the updated paper size.
+- Update `_loadSettings` to handle more paper size values:
+    - 0: 30mm (Ultra-Micro)
+    - 1: 44mm (Micro)
+    - 2: 57mm
+    - 3: 58mm
+    - 4: 72mm
+    - 5: 80mm
+- Update `setPaperSize` to persist these values.
+- Map 30mm and 44mm to `PaperSize.mm58` for the thermal generator (as it's the minimum standard), but we will adjust the content layout manually.
 
-### UI Layer
+### UI Components
 
 #### [MODIFY] [printing_options_screen.dart](file:///F:/mpos/lib/screens/settings/printing_options_screen.dart)
-- Update `_buildPaperSizeSection` to include a 72mm option.
-- Ensure the UI correctly reflects the selected size.
+- Update the Paper Size section to use a `Wrap` or `SingleChildScrollView` row to fit: **30mm, 44mm, 57mm, 58mm, 72mm, 80mm**.
+
+### Receipt & PDF Generation
 
 #### [MODIFY] [pos_payment_success_screen.dart](file:///F:/mpos/lib/screens/pos_screen/pos_payment_success_screen.dart)
-- Update `_buildReceiptPdf` to use a PDF page format that matches the selected paper size (58mm, 72mm, or 80mm).
-- Note: Thermal printing via ESC/POS already respects `provider.paperSize`.
+- **Dynamic PDF Page Format:**
+    - **30mm:** `PdfPageFormat(30 * PdfPageFormat.mm, ...)` with minimal margins.
+    - **44mm:** `PdfPageFormat(44 * PdfPageFormat.mm, ...)`
+- **Condensed Layout Strategy:**
+    - For 30mm and 44mm, automatically reduce the base font size (e.g., from 12 to 8 or 9) and use single-line rows for items to prevent overlapping.
+    - Remove large headers or center-align text if it saves space on narrow paper.
 
 ## Verification Plan
 
 ### Manual Verification
-- **Settings Check:** Navigate to Printing Options and verify that 58mm, 72mm, and 80mm are available and selectable.
-- **Persistence:** Change the size, restart the app, and verify the selection is remembered.
-- **Printing:** Perform a test print and a receipt print with different sizes selected to ensure the commands are sent correctly.
-- **PDF Preview:** Verify that the "Download" or PDF preview respects the width of the selected paper size.
+1.  **Settings Selection:** Verify all sizes from 30mm to 80mm are selectable and saved.
+2.  **30mm PDF:** Generate a 30mm PDF and ensure text is resized correctly to fit the 1.18-inch width.
+3.  **44mm PDF:** Verify layout on the 1.73-inch width.
+4.  **Print Test:** Verify thermal commands generate readable text on the smallest widths.

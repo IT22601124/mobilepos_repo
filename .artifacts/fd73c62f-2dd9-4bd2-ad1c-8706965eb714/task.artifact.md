@@ -1,0 +1,17 @@
+- [x] Add `image` package import to `pos_payment_success_screen.dart`
+- [x] Add `image` to `pubspec.yaml` dependencies
+- [x] Implement `_fetchLogoBytes` helper method
+- [x] Update `_printToThermalPrinter` to include the logo
+- [x] Update `_buildReceiptPdf` to include the logo
+- [x] Update `printReceipt` to fetch the logo before printing
+- [x] Update `sharePdfReceipt` to fetch the logo before sharing
+- [x] Update `_ReceiptCard` (already handled in original code)
+- [x] Add `storeAddress` and `storePhone` to `PosPaymentSuccessScreen`
+- [x] Update `router_chekcer.dart` to pass address and phone
+- [x] Update thermal printer logic for address and phone
+- [x] Update PDF logic for address and phone
+- [x] Update `_ReceiptCard` UI for address and phone
+- [x] Update `AuthProvider.login` with descriptive error handling
+- [x] Add form validation to `NovaLoginScreen`
+- [x] Update `MainButton` loading state in `NovaLoginScreen`
+- [x] Improve error message display in `NovaLoginScreen`

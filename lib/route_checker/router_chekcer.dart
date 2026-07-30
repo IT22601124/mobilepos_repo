@@ -54,6 +54,7 @@ final GoRouter router = GoRouter(
           subtotal: (data['subtotal'] as num?)?.toDouble() ?? 0,
           discount: (data['discount'] as num?)?.toDouble() ?? 0,
           tax: (data['tax'] as num?)?.toDouble() ?? 0,
+          taxRate: (data['taxRate'] as num?)?.toDouble() ?? 0,
           total: (data['total'] as num?)?.toDouble() ?? 0,
           paymentMethod: data['paymentMethod']?.toString() ?? 'Cash',
           cart: List<Map<String, dynamic>>.from(cartData),
@@ -76,12 +77,20 @@ final GoRouter router = GoRouter(
         final storeProfile =
             data['storeProfile'] as Map<String, dynamic>? ?? {};
 
+        final addressLine1 = storeProfile['address_line1']?.toString() ?? '';
+        final addressLine2 = storeProfile['address_line2']?.toString() ?? '';
+        final city = storeProfile['city']?.toString() ?? '';
+        final fullAddress = [addressLine1, addressLine2, city]
+            .where((e) => e.isNotEmpty)
+            .join(', ');
+
         return PosPaymentSuccessScreen(
           saleNo: data['saleNo']?.toString() ?? 'POS-DEMO',
           paymentMethod: data['paymentMethod']?.toString() ?? 'Cash',
           subtotal: (data['subtotal'] as num?)?.toDouble() ?? 0,
           discount: (data['discount'] as num?)?.toDouble() ?? 0,
           tax: (data['tax'] as num?)?.toDouble() ?? 0,
+          taxRate: (data['taxRate'] as num?)?.toDouble() ?? 0,
           total: (data['total'] as num?)?.toDouble() ?? 0,
           paid: (data['paid'] as num?)?.toDouble() ?? 0,
           change: (data['change'] as num?)?.toDouble() ?? 0,
@@ -89,6 +98,8 @@ final GoRouter router = GoRouter(
           customerName: data['customerName']?.toString() ?? 'Walk-in customer',
           cart: List<Map<String, dynamic>>.from(cartData),
           storeName: storeProfile['store_name']?.toString() ?? 'NOVA POS',
+          storeAddress: fullAddress,
+          storePhone: storeProfile['phone']?.toString() ?? '',
           receiptFooter:
               storeProfile['receipt_footer']?.toString() ?? 'Thank you!',
           currencyCode: storeProfile['currency_code']?.toString() ?? 'LKR',

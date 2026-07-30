@@ -65,6 +65,74 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final isSuperAdmin = authProvider.isSuperAdmin;
 
+    const productFields = [
+      _FieldConfig('name', 'Product name', required: true),
+      _FieldConfig('product_code', 'Product code', required: true),
+      _FieldConfig('barcode', 'Barcode'),
+      _FieldConfig('description', 'Description'),
+      _FieldConfig(
+        'category_id',
+        'Category',
+        keyboardType: TextInputType.number,
+        lookupEndpoint: ApiRoutes.categories,
+      ),
+      _FieldConfig(
+        'brand_id',
+        'Brand',
+        keyboardType: TextInputType.number,
+        lookupEndpoint: ApiRoutes.brands,
+      ),
+      _FieldConfig(
+        'unit_id',
+        'Unit',
+        keyboardType: TextInputType.number,
+        lookupEndpoint: ApiRoutes.units,
+      ),
+      _FieldConfig(
+        'selling_price',
+        'Selling price',
+        keyboardType: TextInputType.number,
+      ),
+      _FieldConfig(
+        'cost_price',
+        'Cost price',
+        keyboardType: TextInputType.number,
+      ),
+      _FieldConfig(
+        'wholesale_price',
+        'Wholesale price',
+        keyboardType: TextInputType.number,
+      ),
+      _FieldConfig(
+        'stock_quantity',
+        'Stock quantity',
+        keyboardType: TextInputType.number,
+      ),
+      _FieldConfig(
+        'minimum_stock',
+        'Minimum stock',
+        keyboardType: TextInputType.number,
+      ),
+      _FieldConfig(
+        'tax_rate',
+        'Tax rate',
+        keyboardType: TextInputType.number,
+      ),
+      _FieldConfig(
+        'discount_rate',
+        'Discount rate',
+        keyboardType: TextInputType.number,
+      ),
+      _FieldConfig('image', 'Image path'),
+      _FieldConfig('weight', 'Weight', keyboardType: TextInputType.number),
+      _FieldConfig(
+        'is_weighted',
+        'Weighted item',
+        options: [_FieldOption('true', 'Yes'), _FieldOption('false', 'No')],
+      ),
+      _FieldConfig('status', 'Status', options: _statusOptions),
+    ];
+
     return [
       _ResourceConfig(
         tab: 'Products',
@@ -73,74 +141,21 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         endpoint: ApiRoutes.products,
         icon: Icons.inventory_2_outlined,
         color: _green,
-        fields: const [
-          _FieldConfig('name', 'Product name', required: true),
-          _FieldConfig('product_code', 'Product code', required: true),
-          _FieldConfig('barcode', 'Barcode'),
-          _FieldConfig('description', 'Description'),
-          _FieldConfig(
-            'category_id',
-            'Category',
-            keyboardType: TextInputType.number,
-            lookupEndpoint: ApiRoutes.categories,
-          ),
-          _FieldConfig(
-            'brand_id',
-            'Brand',
-            keyboardType: TextInputType.number,
-            lookupEndpoint: ApiRoutes.brands,
-          ),
-          _FieldConfig(
-            'unit_id',
-            'Unit',
-            keyboardType: TextInputType.number,
-            lookupEndpoint: ApiRoutes.units,
-          ),
-          _FieldConfig(
-            'selling_price',
-            'Selling price',
-            keyboardType: TextInputType.number,
-          ),
-          _FieldConfig(
-            'cost_price',
-            'Cost price',
-            keyboardType: TextInputType.number,
-          ),
-          _FieldConfig(
-            'wholesale_price',
-            'Wholesale price',
-            keyboardType: TextInputType.number,
-          ),
-          _FieldConfig(
-            'stock_quantity',
-            'Stock quantity',
-            keyboardType: TextInputType.number,
-          ),
-          _FieldConfig(
-            'minimum_stock',
-            'Minimum stock',
-            keyboardType: TextInputType.number,
-          ),
-          _FieldConfig(
-            'tax_rate',
-            'Tax rate',
-            keyboardType: TextInputType.number,
-          ),
-          _FieldConfig(
-            'discount_rate',
-            'Discount rate',
-            keyboardType: TextInputType.number,
-          ),
-          _FieldConfig('image', 'Image path'),
-          _FieldConfig('weight', 'Weight', keyboardType: TextInputType.number),
-          _FieldConfig(
-            'is_weighted',
-            'Weighted item',
-            options: [_FieldOption('true', 'Yes'), _FieldOption('false', 'No')],
-          ),
-          _FieldConfig('status', 'Status', options: _statusOptions),
-        ],
+        fields: productFields,
         sample: [],
+      ),
+      _ResourceConfig(
+        tab: 'Stocks',
+        title: 'Current inventory',
+        subtitle: 'View available stock, minimum levels and category.',
+        endpoint: ApiRoutes.products,
+        icon: Icons.inventory_rounded,
+        color: Colors.orange,
+        fields: productFields,
+        sample: [],
+        canCreate: false,
+        canEdit: true,
+        canDelete: true,
       ),
       _simpleResource(
         'Categories',
@@ -1945,6 +1960,10 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
   }
 
   String _titleFor(Map<String, dynamic> record) {
+    if (_activeTab == 'Stocks') {
+      return record['name']?.toString() ?? 'Unnamed product';
+    }
+
     final relationTitle = _firstValue(record, [
       'name',
       'title',
@@ -1966,6 +1985,14 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
   }
 
   String _subtitleFor(Map<String, dynamic> record) {
+    if (_activeTab == 'Stocks') {
+      final category = record['category'];
+      final categoryName = category is Map
+          ? category['name']?.toString() ?? 'Uncategorized'
+          : record['category_name']?.toString() ?? 'Uncategorized';
+      return 'Code: ${record['product_code'] ?? record['sku']} / Cat: $categoryName';
+    }
+
     final preferred = [
       'product_code',
       'sku',
@@ -1998,6 +2025,11 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
   }
 
   String _trailingFor(Map<String, dynamic> record) {
+    if (_activeTab == 'Stocks') {
+      final stock = record['stock_quantity'] ?? record['stock'] ?? '0';
+      return 'Qty: $stock';
+    }
+
     for (final key in [
       'selling_price',
       'grand_total',
@@ -3197,7 +3229,7 @@ class _ResourceActionCard extends StatelessWidget {
                   ),
                 ),
               ),
-              ?extraAction,
+              if (extraAction != null) extraAction!,
             ],
           ),
         ],

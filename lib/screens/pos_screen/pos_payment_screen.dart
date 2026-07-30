@@ -9,6 +9,7 @@ class PosPaymentScreen extends StatefulWidget {
   final double subtotal;
   final double discount;
   final double tax;
+  final double taxRate;
   final double total;
   final String paymentMethod;
   final List<Map<String, dynamic>> cart;
@@ -18,6 +19,7 @@ class PosPaymentScreen extends StatefulWidget {
     required this.subtotal,
     required this.discount,
     required this.tax,
+    required this.taxRate,
     required this.total,
     required this.paymentMethod,
     required this.cart,
@@ -317,6 +319,7 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
           'subtotal': widget.subtotal,
           'discount': widget.discount,
           'tax': widget.tax,
+          'taxRate': widget.taxRate,
           'total': widget.total,
           'paid': amountPaid,
           'change': changeDue,
@@ -359,6 +362,7 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
       'subtotal': widget.subtotal,
       'discount_total': widget.discount,
       'tax_total': widget.tax,
+      'tax_rate': widget.taxRate,
       'grand_total': widget.total,
       'paid_amount': amountPaid,
       'balance_amount': paymentMethod == 'Credit' ? creditAmount : 0,
@@ -387,6 +391,7 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
     return {
       'product_id': item['id'],
       'qty': qty,
+      'quantity': qty,
       'unit_price': unitPrice,
       'discount': itemDiscount,
       'tax': itemTax,
@@ -597,6 +602,7 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
                       subtotal: widget.subtotal,
                       discount: widget.discount,
                       tax: widget.tax,
+                      taxRate: widget.taxRate,
                       total: widget.total,
                       cart: widget.cart,
                     ),
@@ -883,6 +889,7 @@ class _OrderSummary extends StatelessWidget {
   final double subtotal;
   final double discount;
   final double tax;
+  final double taxRate;
   final double total;
   final List<Map<String, dynamic>> cart;
 
@@ -890,6 +897,7 @@ class _OrderSummary extends StatelessWidget {
     required this.subtotal,
     required this.discount,
     required this.tax,
+    required this.taxRate,
     required this.total,
     required this.cart,
   });
@@ -910,15 +918,22 @@ class _OrderSummary extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           ...cart.map(
-            (item) => _InfoRow(
-              label: '${item['name']} x ${item['qty']}',
-              value: money((item['price'] as double) * (item['qty'] as int)),
-            ),
+            (item) {
+              final qty = (item['qty'] as num?)?.toDouble() ?? 0.0;
+              final isWeighted = item['is_weighted'] == true;
+              final unitName = item['unit_name']?.toString() ?? (isWeighted ? 'kg' : 'pcs');
+              final qtyText = isWeighted ? qty.toStringAsFixed(3) : qty.toInt().toString();
+
+              return _InfoRow(
+                label: '${item['name']} x $qtyText $unitName',
+                value: money(((item['price'] as num?)?.toDouble() ?? 0.0) * qty),
+              );
+            },
           ),
           const Divider(),
           _InfoRow(label: 'Subtotal', value: money(subtotal)),
           _InfoRow(label: 'Discount', value: money(discount)),
-          _InfoRow(label: 'Tax 8%', value: money(tax)),
+          _InfoRow(label: 'Tax ${taxRate.toStringAsFixed(0)}%', value: money(tax)),
           _InfoRow(label: 'Total', value: money(total), strong: true),
         ],
       ),

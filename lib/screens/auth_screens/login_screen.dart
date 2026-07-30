@@ -30,22 +30,26 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
 
   Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
-      try{
+      try {
         final provider = Provider.of<AuthProvider>(context, listen: false);
-        final success = await  provider.login(
+        final success = await provider.login(
           _phoneController.text.trim(),
           _passwordController.text.trim(),
         );
         if (!success) {
-          throw Exception('Invalid credentials');
+          throw 'Login failed. Please try again.';
         }
         if (!mounted) return;
         CustomSnackBar.success(context, 'Login successful');
         context.go('/mainNavigation');
-    }
-      catch(e){
+      } catch (e) {
         if (!mounted) return;
-        CustomSnackBar.error(context, 'Login failed: $e');
+        // Strip "Exception: " if present
+        String message = e.toString();
+        if (message.startsWith('Exception: ')) {
+          message = message.replaceFirst('Exception: ', '');
+        }
+        CustomSnackBar.error(context, message);
       }
     }
   }
@@ -129,6 +133,15 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
                     style: TextStyle(color: color.onSurface),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Mobile number is required';
+                      }
+                      if (value.trim().length < 9) {
+                        return 'Enter a valid mobile number';
+                      }
+                      return null;
+                    },
                     decoration: InputDecoration(
                       hintText: 'e.g. 0777123456',
                       hintStyle: TextStyle(
@@ -177,6 +190,15 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     style: TextStyle(color: color.onSurface),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Password is required';
+                      }
+                      if (value.length < 4) {
+                        return 'Password is too short';
+                      }
+                      return null;
+                    },
                     decoration: InputDecoration(
                       hintText: '••••••••',
                       hintStyle: TextStyle(
@@ -241,24 +263,32 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
 
                   const SizedBox(height: 24),
 
-                  MainButton(text: 'Login', onPressed: _handleLogin,),
+                  Consumer<AuthProvider>(
+                    builder: (context, provider, child) {
+                      return MainButton(
+                        text: 'Login',
+                        onPressed: provider.isLoading ? null : _handleLogin,
+                        isLoading: provider.isLoading,
+                      );
+                    },
+                  ),
 
                   const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'New merchant? ',
-                        style: TextStyle(
-                          color: color.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => context.go('/register'),
-                        child: const Text('Create account'),
-                      ),
-                    ],
-                  ),
+                  // Row(
+                  //   mainAxisAlignment: MainAxisAlignment.center,
+                  //   children: [
+                  //     Text(
+                  //       'New merchant? ',
+                  //       style: TextStyle(
+                  //         color: color.onSurface.withValues(alpha: 0.6),
+                  //       ),
+                  //     ),
+                  //     TextButton(
+                  //       onPressed: () => context.go('/register'),
+                  //       child: const Text('Create account'),
+                  //     ),
+                  //   ],
+                  // ),
                 ],
               ),
             ),
