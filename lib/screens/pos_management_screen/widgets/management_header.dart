@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 class ManagementHeader extends StatelessWidget {
@@ -33,7 +34,7 @@ class ManagementHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'POS Management',
+                  context.tr('pos_management'),
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -41,7 +42,7 @@ class ManagementHeader extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'Reports, stock, cashiers and credit',
+                  context.tr('management_subtitle'),
                   style: TextStyle(
                     color: colorScheme.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
@@ -66,7 +67,7 @@ class ManagementHeader extends StatelessWidget {
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  'Live API',
+                  context.tr('live_api'),
                   style: TextStyle(
                     color: isDark ? const Color(0xFF10B981) : const Color(0xFF15803D),
                     fontSize: 12,

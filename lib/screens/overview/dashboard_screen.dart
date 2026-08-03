@@ -497,13 +497,13 @@ class _QuickActions extends StatelessWidget {
         _ActionButton(
           icon: Icons.receipt_long,
           label: 'Reports',
-          onTap: () => context.go('/pos-management'),
+          onTap: () => context.go('/pos-management?tab=Reports'),
         ),
         const SizedBox(width: 10),
         _ActionButton(
           icon: Icons.inventory_2_outlined,
           label: 'Products',
-          onTap: () => context.go('/pos-management'),
+          onTap: () => context.go('/pos-management?tab=Products'),
         ),
       ],
     );

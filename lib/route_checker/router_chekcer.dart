@@ -63,7 +63,10 @@ final GoRouter router = GoRouter(
     ),
     GoRoute(
       path: '/pos-management',
-      builder: (context, state) => const PosManagementScreen(),
+      builder: (context, state) {
+        final initialTab = state.uri.queryParameters['tab'];
+        return PosManagementScreen(initialTab: initialTab);
+      },
     ),
     GoRoute(
       path: '/printing-options',
