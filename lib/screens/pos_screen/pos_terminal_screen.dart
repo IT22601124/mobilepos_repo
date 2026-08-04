@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:mpos/dio_client/dio_client.dart';
+import 'package:mpos/provider/connectivity_provider.dart';
+import 'package:mpos/provider/sync_provider.dart';
 import 'package:mpos/resources/api_routes.dart';
+import 'package:provider/provider.dart';
 import 'package:mpos/screens/pos_screen/widgets/barcode_scanner_view.dart';
 import 'package:mpos/screens/pos_screen/widgets/card_tems.dart';
 import 'package:mpos/screens/pos_screen/widgets/category_tabs.dart';
@@ -12,6 +15,8 @@ import 'package:mpos/screens/pos_screen/widgets/searchbox.dart';
 import 'package:mpos/screens/pos_screen/widgets/weight_input_dialog.dart';
 import 'package:mpos/utils/app_back_scope.dart';
 import 'package:mpos/utils/custom_snackbar.dart';
+
+import '../../provider/printing_provider.dart';
 
 class PosTerminalScreen extends StatefulWidget {
   const PosTerminalScreen({super.key});
@@ -211,31 +216,44 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
     });
 
     try {
-      final responses = await Future.wait([
-        _dio.get(ApiRoutes.products),
-        _dio.get(ApiRoutes.categories),
-        _dio.get(ApiRoutes.posSettings),
-      ]);
-
-      final productRows = _extractRows(responses[0].data);
-      final categoryRows = _extractRows(responses[1].data);
+      final isOnline = context.read<ConnectivityProvider>().isOnline;
+      final syncProvider = context.read<SyncProvider>();
       
-      final settingsData = _asMap(responses[2].data);
+      final data = await syncProvider.loadCatalogData(isOnline);
+
+      final productRows = (data['products'] as List).cast<Map<String, dynamic>>();
+      final loadedCategories = (data['categories'] as List).cast<String>();
+      
+      final settingsData = _asMap(data['settings']);
       final fetchedTaxRate = _toDouble(settingsData['default_tax_percent']);
 
-      final loadedProducts = productRows.map(_productFromApi).toList();
-      final loadedCategories = categoryRows
-          .map((item) => item['name']?.toString() ?? '')
-          .where((name) => name.isNotEmpty)
-          .toSet()
-          .toList();
+      final loadedProducts = productRows.map((item) {
+        // If from local DB, it's already formatted
+        if (data['source'] == 'local') return item;
+        return _productFromApi(item);
+      }).toList();
+
+      final storeProfile = _asMap(data['storeProfile']);
+      final logoUrl = _logoUrl(storeProfile);
+      if (mounted) {
+        context.read<PrintingProvider>().fetchAndCacheLogo(logoUrl);
+      }
 
       setState(() {
         products = loadedProducts;
         taxRate = fetchedTaxRate;
         categories = ['All', ...loadedCategories];
         if (!categories.contains(selectedCategory)) selectedCategory = 'All';
+        
+        if (data['source'] == 'local' && isOnline) {
+          error = 'Loading from local cache due to API error.';
+        }
       });
+      
+      // If we are back online, trigger a queue sync
+      if (isOnline) {
+        syncProvider.syncQueue();
+      }
     } catch (apiError) {
       setState(() {
         products = [];
@@ -245,6 +263,24 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  String _logoUrl(Map<String, dynamic> profile) {
+    final logoUrl = profile['logo_url']?.toString() ?? '';
+    final logo = profile['logo']?.toString() ?? '';
+
+    if (logoUrl.isNotEmpty) {
+      return logoUrl.replaceFirst(
+        'http://localhost:5000',
+        'http://10.0.2.2:5000',
+      );
+    }
+    if (logo.startsWith('http')) {
+      return logo.replaceFirst('http://localhost:5000', 'http://10.0.2.2:5000');
+    }
+    if (logo.startsWith('/uploads')) return 'http://10.0.2.2:5000$logo';
+
+    return '';
   }
 
   List<Map<String, dynamic>> _extractRows(dynamic payload) {
@@ -505,6 +541,9 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isOnline = context.watch<ConnectivityProvider>().isOnline;
+    final pendingCount = context.watch<SyncProvider>().pendingCount;
+
     return AppBackScope(
       fallbackRoute: '/mainNavigation',
       child: Scaffold(
@@ -518,6 +557,8 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
             ).toInt(),
             total: money(total),
             isLoading: isLoading,
+            isOnline: isOnline,
+            pendingCount: pendingCount,
             onRefresh: _loadCatalog,
             onHeldOrders: showHeldOrders,
             onHome: () => context.go('/mainNavigation'),
@@ -639,6 +680,8 @@ class _TerminalHeader extends StatelessWidget {
   final int cartCount;
   final String total;
   final bool isLoading;
+  final bool isOnline;
+  final int pendingCount;
   final VoidCallback onRefresh;
   final VoidCallback onHeldOrders;
   final VoidCallback onHome;
@@ -647,6 +690,8 @@ class _TerminalHeader extends StatelessWidget {
     required this.cartCount,
     required this.total,
     required this.isLoading,
+    required this.isOnline,
+    required this.pendingCount,
     required this.onRefresh,
     required this.onHeldOrders,
     required this.onHome,
@@ -678,13 +723,23 @@ class _TerminalHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'Terminal',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  'Terminal',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              _ConnectionBadge(isOnline: isOnline),
+            ],
           ),
           Text(
             '$cartCount items • $total',
@@ -697,6 +752,32 @@ class _TerminalHeader extends StatelessWidget {
         ],
       ),
       actions: [
+        if (pendingCount > 0)
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.sync_problem, size: 12, color: Colors.orange),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$pendingCount pending',
+                    style: const TextStyle(
+                      color: Colors.orange,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         _HeaderAction(
           icon: Icons.pause_circle_filled_rounded,
           onTap: onHeldOrders,
@@ -718,6 +799,34 @@ class _TerminalHeader extends StatelessWidget {
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Divider(height: 1, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+      ),
+    );
+  }
+}
+
+class _ConnectionBadge extends StatelessWidget {
+  final bool isOnline;
+
+  const _ConnectionBadge({required this.isOnline});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: (isOnline ? Colors.green : Colors.red).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: (isOnline ? Colors.green : Colors.red).withValues(alpha: 0.3),
+        ),
+      ),
+      child: Text(
+        isOnline ? 'ONLINE' : 'OFFLINE',
+        style: TextStyle(
+          color: isOnline ? Colors.green : Colors.red,
+          fontSize: 8,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platform_image_3.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:dio/dio.dart';
 
 enum PrinterConnectionType { bluetooth, usb }
 
@@ -22,6 +23,9 @@ class PrintingProvider with ChangeNotifier {
   int _paperWidthMm = 80;
   
   bool _autoPrint = false;
+
+  Uint8List? _logoBytes;
+  Uint8List? get logoBytes => _logoBytes;
   
   List<BluetoothPrinter> get bluetoothDevices => _bluetoothDevices;
   List<UsbPrinter> get usbDevices => _usbDevices;
@@ -72,6 +76,27 @@ class PrintingProvider with ChangeNotifier {
       prefs.setInt('paper_width_mm', widthMm);
     });
     notifyListeners();
+  }
+
+  Future<void> fetchAndCacheLogo(String? url) async {
+    if (url == null || url.isEmpty) return;
+    
+    // Don't re-fetch if we already have it
+    if (_logoBytes != null) return;
+
+    try {
+      final response = await Dio().get<List<int>>(
+        url,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      if (response.data != null) {
+        _logoBytes = Uint8List.fromList(response.data!);
+        debugPrint('Logo fetched and cached successfully: $url');
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error fetching logo: $e');
+    }
   }
 
   // Deprecated - kept for compatibility if needed elsewhere

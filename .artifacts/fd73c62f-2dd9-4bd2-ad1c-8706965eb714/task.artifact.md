@@ -1,17 +1,9 @@
-- [x] Add `image` package import to `pos_payment_success_screen.dart`
-- [x] Add `image` to `pubspec.yaml` dependencies
-- [x] Implement `_fetchLogoBytes` helper method
-- [x] Update `_printToThermalPrinter` to include the logo
-- [x] Update `_buildReceiptPdf` to include the logo
-- [x] Update `printReceipt` to fetch the logo before printing
-- [x] Update `sharePdfReceipt` to fetch the logo before sharing
-- [x] Update `_ReceiptCard` (already handled in original code)
-- [x] Add `storeAddress` and `storePhone` to `PosPaymentSuccessScreen`
-- [x] Update `router_chekcer.dart` to pass address and phone
-- [x] Update thermal printer logic for address and phone
-- [x] Update PDF logic for address and phone
-- [x] Update `_ReceiptCard` UI for address and phone
-- [x] Update `AuthProvider.login` with descriptive error handling
-- [x] Add form validation to `NovaLoginScreen`
-- [x] Update `MainButton` loading state in `NovaLoginScreen`
-- [x] Improve error message display in `NovaLoginScreen`
+- [x] Add `sqflite`, `connectivity_plus`, and `path` to `pubspec.yaml`
+- [x] Create `lib/database/database_helper.dart` for SQLite management
+- [x] Create `lib/provider/connectivity_provider.dart` for monitoring internet status
+- [x] Create `lib/provider/sync_provider.dart` for data synchronization logic
+- [x] Register new providers in `lib/main.dart`
+- [x] Update `pos_terminal_screen.dart` to support offline catalog loading
+- [x] Update `pos_payment_screen.dart` to support saving offline sales
+- [x] Implement background synchronization trigger (in `_loadCatalog` and `SyncProvider`)
+- [x] Add offline status indicators to the UI

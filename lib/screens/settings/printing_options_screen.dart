@@ -65,7 +65,7 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
   }
 
   Widget _buildPaperSizeSection(PrintingProvider provider, ThemeData theme) {
-    final sizes = [30, 44, 57, 58, 72, 80];
+    final sizes = [30, 44, 57, 58, 70, 72, 80];
 
     return Card(
       elevation: 0,

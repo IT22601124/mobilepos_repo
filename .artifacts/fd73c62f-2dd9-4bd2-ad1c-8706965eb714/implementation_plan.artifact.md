@@ -1,38 +1,68 @@
-# Implementation Plan - User Friendly Login Messages
+# Implementation Plan - 100% Functional Offline Mode
 
-The goal is to provide clear, helpful feedback to the user when login fails or when inputs are invalid.
+The goal is to enable the POS system to function fully without an internet connection by implementing local data persistence and a background synchronization mechanism.
 
 ## User Review Required
 
-> [!NOTE]
-> I will be adding basic validation to the login fields (phone and password). Please let me know if you have specific requirements for phone number length or character constraints.
+> [!IMPORTANT]
+> **Stock Accuracy:** In offline mode, stock levels are only as accurate as the last time the app was online. If multiple devices are used offline, overselling might occur until all devices sync.
+> **Sale Numbers:** Offline sales will use temporary local IDs (e.g., `OFFLINE-timestamp`) until the server assigns a permanent Sale No. during synchronization.
 
 ## Proposed Changes
 
-### [mpos](file:///F:/mpos)
+### Dependencies
+Add the following to `pubspec.yaml`:
+- `sqflite`: Local database storage.
+- `connectivity_plus`: Real-time internet connection monitoring.
+- `path`: Helper for database file paths.
 
-#### [MODIFY] [auth_provider.dart](file:///F:/mpos/lib/provider/auth_provider/auth_provider.dart)
-- Update `login` method to handle `DioException`.
-- Throw descriptive strings (not just `Exception`) based on the error type and response status code:
-    - 401: "Incorrect phone number or password."
-    - 404: "User account not found."
-    - Network issues: "Network error. Please check your connection."
-    - Other: "An unexpected error occurred. Please try again."
+---
 
-#### [MODIFY] [login_screen.dart](file:///F:/mpos/lib/screens/auth_screens/login_screen.dart)
-- Add form validation to `TextFormField`s:
-    - Phone: Check if empty or too short.
-    - Password: Check if empty or too short.
-- Update `_handleLogin` to:
-    - Show `isLoading` on the `MainButton` using `context.watch<AuthProvider>().isLoading`.
-    - Catch errors and display them cleanly (removing `Exception:` prefix if present).
-- Ensure the login button is disabled while loading.
+### [Component] Local Database Layer
+#### [NEW] [database_helper.dart](file:///F:/mpos/lib/database/database_helper.dart)
+- Singleton class to manage SQLite database.
+- Tables:
+    - `products`: Cache for the product catalog.
+    - `categories`: Cache for product categories.
+    - `customers`: Cache for customer list.
+    - `sync_queue`: Queue for sales made while offline.
+
+---
+
+### [Component] Connectivity & Sync Logic
+#### [NEW] [connectivity_provider.dart](file:///F:/mpos/lib/provider/connectivity_provider.dart)
+- Monitors connection status using `connectivity_plus`.
+- Provides a `isOnline` boolean to the entire app.
+
+#### [NEW] [sync_provider.dart](file:///F:/mpos/lib/provider/sync_provider.dart)
+- **Catalog Sync:** Fetches from API when online and updates the local cache. Returns local cache when offline.
+- **Sale Handling:**
+    - If `isOnline`, sends directly to API.
+    - If `isOffline`, saves to `sync_queue`.
+- **Background Sync:** Listens for connection restoration and automatically pushes all items in `sync_queue` to the server.
+
+---
+
+### [Component] UI Integration
+#### [MODIFY] [pos_terminal_screen.dart](file:///F:/mpos/lib/screens/pos_screen/pos_terminal_screen.dart)
+- Update `_loadCatalog` to use `SyncProvider`.
+- Add an "Offline Mode" badge in the header when disconnected.
+- Show "Pending Sync" count in the header.
+
+#### [MODIFY] [pos_payment_screen.dart](file:///F:/mpos/lib/screens/pos_screen/pos_payment_screen.dart)
+- Update `completePayment` to use `SyncProvider`.
+- Allow "Walk-in" sales to complete without an internet connection.
+
+---
 
 ## Verification Plan
 
+### Automated Tests
+- Unit tests for `DatabaseHelper` CRUD operations.
+- Mock connectivity tests to ensure `SyncProvider` switches modes correctly.
+
 ### Manual Verification
-1. **Wrong Credentials:** Try logging in with a wrong password. Verify that "Incorrect phone number or password" appears.
-2. **Network Off:** Disable Wi-Fi/Data and try logging in. Verify that "Network error" appears.
-3. **Empty Fields:** Try logging in with empty fields. Verify that validation errors appear under the text fields.
-4. **Successful Login:** Verify that normal login still works.
-5. **Loading State:** Verify that the login button shows a loading spinner during the request.
+1. **Catalog Cache:** Open app online, then close and reopen in Airplane Mode. Catalog should still load.
+2. **Offline Sale:** Complete a sale while offline. Verify it's saved locally.
+3. **Automatic Sync:** Turn on internet. Verify the "Pending Sync" count goes to 0 and the sale appears in the Web Admin.
+4. **Resilience:** Interrupted sync should retry on the next connection event.

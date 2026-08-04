@@ -10,7 +10,6 @@ import 'package:provider/provider.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platform_image_3.dart';
 import 'package:image/image.dart' as img;
-import 'package:dio/dio.dart';
 
 class PosPaymentSuccessScreen extends StatefulWidget {
   final String saleNo;
@@ -81,31 +80,13 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
     return double.tryParse(value?.toString() ?? '') ?? 0;
   }
 
-  Future<Uint8List?> _fetchLogoBytes(String url) async {
-    if (url.isEmpty) return null;
-    try {
-      final response = await Dio().get<List<int>>(
-        url,
-        options: Options(responseType: ResponseType.bytes),
-      );
-      if (response.data != null) {
-        return Uint8List.fromList(response.data!);
-      }
-    } catch (e) {
-      debugPrint('Error fetching logo: $e');
-    }
-    return null;
-  }
-
   Future<void> printReceipt(BuildContext context) async {
     final printingProvider = context.read<PrintingProvider>();
-    final logoBytes = await _fetchLogoBytes(widget.logoUrl);
+    final logoBytes = printingProvider.logoBytes;
 
     if (printingProvider.isConnected) {
-      // Print directly to the thermal printer
       await _printToThermalPrinter(printingProvider, logoBytes);
     } else {
-      // Fallback to system print dialog (PDF)
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => _buildReceiptPdf(logoBytes).save(),
       );
@@ -125,11 +106,18 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
       try {
         final img.Image? image = img.decodeImage(logoBytes);
         if (image != null) {
-          // Resize image to fit paper width
-          // 80mm is usually 576 dots, 58mm is 384 dots
-          int targetWidth = provider.paperSize == PaperSize.mm80 ? 400 : 200;
-          if (isTiny) targetWidth = 150;
-          
+          // Drastically reduced for "Extra Small" look
+          int targetWidth;
+          if (width >= 80) {
+            targetWidth = 140; 
+          } else if (width >= 70) {
+            targetWidth = 135;
+          } else if (width >= 58) {
+            targetWidth = 100; 
+          } else {
+            targetWidth = 60; 
+          }
+
           final resizedImage = img.copyResize(image, width: targetWidth);
           bytes += generator.image(resizedImage);
           bytes += generator.feed(1);
@@ -139,25 +127,121 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
       }
     }
 
+    // Helper to add text or rows with simulated margins
+    void addLine(String text, {PosStyles styles = const PosStyles()}) {
+      // Simulate a small margin (approx 0.5 column) using spaces
+      const String leftMargin = "  "; 
+      const String rightMargin = "  ";
+      if (isTiny) {
+        bytes += generator.text(leftMargin + text + rightMargin, styles: styles);
+      } else {
+        int margin = width >= 70 ? 0 : 0;
+        if (margin <= 0) {
+          bytes += generator.text(leftMargin + text + rightMargin, styles: styles);
+        } else {
+          bytes += generator.row([
+            PosColumn(text: '', width: margin),
+            PosColumn(text: text, width: 12 - (margin * 2), styles: styles),
+            PosColumn(text: '', width: margin),
+          ]);
+        }
+      }
+    }
+
+    void addRow(List<PosColumn> columns) {
+      // Simulate a small margin (approx 0.5 column) using spaces
+      const String leftMargin = "  ";
+      const String rightMargin = "  ";
+      
+      if (isTiny) {
+        if (columns.isNotEmpty) {
+           // Add left padding to first column
+           columns[0] = PosColumn(
+            text: leftMargin + columns[0].text,
+            width: columns[0].width,
+            styles: columns[0].styles,
+          );
+          // Add right padding to last column
+          if (columns.length > 1) {
+            columns[columns.length - 1] = PosColumn(
+              text: columns[columns.length - 1].text + rightMargin,
+              width: columns[columns.length - 1].width,
+              styles: columns[columns.length - 1].styles,
+            );
+          }
+        }
+        bytes += generator.row(columns);
+      } else {
+        int margin = width >= 70 ? 0 : 0;
+        if (margin <= 0) {
+          if (columns.isNotEmpty) {
+             columns[0] = PosColumn(
+              text: leftMargin + columns[0].text,
+              width: columns[0].width,
+              styles: columns[0].styles,
+            );
+            if (columns.length > 1) {
+              columns[columns.length - 1] = PosColumn(
+                text: columns[columns.length - 1].text + rightMargin,
+                width: columns[columns.length - 1].width,
+                styles: columns[columns.length - 1].styles,
+              );
+            }
+          }
+          bytes += generator.row(columns);
+        } else {
+          int availableWidth = 12 - (margin * 2);
+
+          // Adjust column widths to fit in available space
+          int totalOriginalWidth = 0;
+          for (var col in columns) {
+            totalOriginalWidth += col.width;
+          }
+
+          List<PosColumn> adjustedColumns = [];
+          adjustedColumns.add(PosColumn(text: '', width: margin));
+
+          int currentSum = 0;
+          for (int i = 0; i < columns.length; i++) {
+            int newWidth =
+                ((columns[i].width / totalOriginalWidth) * availableWidth)
+                    .round();
+            if (i == columns.length - 1) {
+              newWidth = availableWidth - currentSum;
+            }
+            currentSum += newWidth;
+
+            adjustedColumns.add(PosColumn(
+              text: columns[i].text,
+              width: newWidth,
+              styles: columns[i].styles,
+            ));
+          }
+
+          adjustedColumns.add(PosColumn(text: '', width: margin));
+          bytes += generator.row(adjustedColumns);
+        }
+      }
+    }
+
     // Header
-    bytes += generator.text(widget.storeName,
+    addLine(widget.storeName,
         styles: PosStyles(
           align: PosAlign.center,
           bold: true,
           height: isTiny ? PosTextSize.size1 : PosTextSize.size2,
           width: isTiny ? PosTextSize.size1 : PosTextSize.size2,
         ));
-    bytes += generator.text('Sales Receipt',
-        styles: const PosStyles(align: PosAlign.center));
+    addLine('Sales Receipt', styles: const PosStyles(align: PosAlign.center));
     bytes += generator.feed(1);
 
     // Info
-    bytes += generator.text('Sale: ${widget.saleNo}');
+    addLine('Sale: ${widget.saleNo}');
     if (!isTiny) {
-      bytes += generator.text('Customer: ${widget.customerName}');
-      bytes += generator.text('Payment: ${widget.paymentMethod}');
+      addLine('Customer: ${widget.customerName}');
+      addLine('Payment: ${widget.paymentMethod}');
     }
-    bytes += generator.text('Date: ${DateTime.now().toString().substring(0, 16)}');
+    addLine('Date: ${DateTime.now().toString().substring(0, 16)}');
     bytes += generator.hr();
 
     // Items
@@ -166,17 +250,19 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
       final price = _toDouble(item['price']);
       final lineTotal = qty * price;
       final isWeighted = item['is_weighted'] == true;
-      final unitName = item['unit_name']?.toString() ?? (isWeighted ? 'kg' : 'pcs');
-      final qtyText = isWeighted ? qty.toStringAsFixed(3) : qty.toInt().toString();
+      final unitName =
+          item['unit_name']?.toString() ?? (isWeighted ? 'kg' : 'pcs');
+      final qtyText =
+          isWeighted ? qty.toStringAsFixed(3) : qty.toInt().toString();
 
-      bytes += generator.text(item['name'].toString(),
-          styles: const PosStyles(bold: true));
-      
+      addLine(item['name'].toString(), styles: const PosStyles(bold: true));
+
       if (isTiny) {
         bytes += generator.text('$qtyText $unitName x ${money(price)}');
-        bytes += generator.text(money(lineTotal), styles: const PosStyles(align: PosAlign.right));
+        bytes += generator.text(money(lineTotal),
+            styles: const PosStyles(align: PosAlign.right));
       } else {
-        bytes += generator.row([
+        addRow([
           PosColumn(text: '$qtyText $unitName x ${money(price)}', width: 7),
           PosColumn(
               text: money(lineTotal),
@@ -189,11 +275,12 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
     bytes += generator.hr();
 
     // Summary
-    void addRow(String label, double value, {bool bold = false}) {
+    void addSummaryRow(String label, double value, {bool bold = false}) {
       if (isTiny) {
-        bytes += generator.text('$label: ${money(value)}', styles: PosStyles(align: PosAlign.right, bold: bold));
+        bytes += generator.text('$label: ${money(value)}',
+            styles: PosStyles(align: PosAlign.right, bold: bold));
       } else {
-        bytes += generator.row([
+        addRow([
           PosColumn(text: label, width: 7, styles: PosStyles(bold: bold)),
           PosColumn(
               text: money(value),
@@ -203,17 +290,17 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
       }
     }
 
-    addRow('Subtotal', widget.subtotal);
-    addRow('Discount', widget.discount);
-    addRow('Tax ${widget.taxRate.toStringAsFixed(0)}%', widget.tax);
-    
+    addSummaryRow('Subtotal', widget.subtotal);
+    addSummaryRow('Discount', widget.discount);
+    addSummaryRow('Tax ${widget.taxRate.toStringAsFixed(0)}%', widget.tax);
+
     bytes += generator.hr();
-    
+
     if (isTiny) {
-      bytes += generator.text('TOTAL: ${money(widget.total)}', 
+      bytes += generator.text('TOTAL: ${money(widget.total)}',
           styles: const PosStyles(align: PosAlign.right, bold: true));
     } else {
-      bytes += generator.row([
+      addRow([
         PosColumn(
             text: 'TOTAL',
             width: 7,
@@ -227,26 +314,26 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
     }
 
     bytes += generator.feed(1);
-    bytes += generator.text('Paid: ${money(widget.paid)}',
+    addLine('Paid: ${money(widget.paid)}',
         styles: const PosStyles(align: PosAlign.right));
-    
+
     if (widget.paymentMethod == 'Cash') {
-      bytes += generator.text('Change: ${money(widget.change)}',
+      addLine('Change: ${money(widget.change)}',
           styles: const PosStyles(align: PosAlign.right));
     }
 
     bytes += generator.feed(1);
     if (widget.storeAddress.isNotEmpty) {
-      bytes += generator.text(widget.storeAddress,
+      addLine(widget.storeAddress,
           styles: const PosStyles(align: PosAlign.center));
     }
     if (widget.storePhone.isNotEmpty) {
-      bytes += generator.text('Phone: ${widget.storePhone}',
+      addLine('Phone: ${widget.storePhone}',
           styles: const PosStyles(align: PosAlign.center));
     }
-    
+
     bytes += generator.feed(1);
-    bytes += generator.text(widget.receiptFooter,
+    addLine(widget.receiptFooter,
         styles: const PosStyles(align: PosAlign.center));
     bytes += generator.feed(3);
     bytes += generator.cut();
@@ -259,7 +346,8 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
   }
 
   Future<void> sharePdfReceipt() async {
-    final logoBytes = await _fetchLogoBytes(widget.logoUrl);
+    final printingProvider = context.read<PrintingProvider>();
+    final logoBytes = printingProvider.logoBytes;
     final pdfBytes = await _buildReceiptPdf(logoBytes).save();
 
     await Printing.sharePdf(bytes: pdfBytes, filename: '${widget.saleNo}-receipt.pdf');
@@ -273,90 +361,152 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
 
     PdfPageFormat format;
     if (widthMm == 30) {
-      format = PdfPageFormat(30 * PdfPageFormat.mm, double.infinity, marginAll: 2 * PdfPageFormat.mm);
+      format = PdfPageFormat(30 * PdfPageFormat.mm, double.infinity, 
+          marginLeft: 2 * PdfPageFormat.mm, marginRight: 2 * PdfPageFormat.mm, 
+          marginTop: 2 * PdfPageFormat.mm, marginBottom: 2 * PdfPageFormat.mm);
     } else if (widthMm == 44) {
-      format = PdfPageFormat(44 * PdfPageFormat.mm, double.infinity, marginAll: 3 * PdfPageFormat.mm);
+      format = PdfPageFormat(44 * PdfPageFormat.mm, double.infinity, 
+          marginLeft: 4 * PdfPageFormat.mm, marginRight: 4 * PdfPageFormat.mm,
+          marginTop: 2 * PdfPageFormat.mm, marginBottom: 2 * PdfPageFormat.mm);
     } else if (widthMm == 57) {
-      format = PdfPageFormat.roll57;
+      format = PdfPageFormat.roll57.copyWith(
+          marginLeft: 5 * PdfPageFormat.mm, marginRight: 5 * PdfPageFormat.mm);
     } else if (widthMm == 58) {
-      format = PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, marginAll: 5 * PdfPageFormat.mm);
-    } else if (widthMm == 72) {
-      format = PdfPageFormat(72 * PdfPageFormat.mm, double.infinity, marginAll: 5 * PdfPageFormat.mm);
+      format = PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, 
+          marginLeft: 6 * PdfPageFormat.mm, marginRight: 6 * PdfPageFormat.mm,
+          marginTop: 2 * PdfPageFormat.mm, marginBottom: 2 * PdfPageFormat.mm);
+    } else if (widthMm == 70 || widthMm == 72) {
+      format = PdfPageFormat(widthMm * PdfPageFormat.mm, double.infinity, 
+          marginLeft: 5 * PdfPageFormat.mm, marginRight: 5 * PdfPageFormat.mm,
+          marginTop: 2 * PdfPageFormat.mm, marginBottom: 2 * PdfPageFormat.mm);
     } else {
-      format = PdfPageFormat.roll80;
+      format = PdfPageFormat.roll80.copyWith(
+          marginLeft: 5 * PdfPageFormat.mm, marginRight: 5 * PdfPageFormat.mm,
+          marginTop: 2 * PdfPageFormat.mm, marginBottom: 2 * PdfPageFormat.mm);
     }
 
     pdf.addPage(
       pw.Page(
         pageFormat: format,
         build: (pw.Context context) {
-          final double fontSize = isTiny ? 7 : 9;
-          final double headerSize = isTiny ? 10 : 14;
+          final double baseFontSize = widthMm >= 70 ? 10 : 9;
+          final double fontSize = isTiny ? 7 : baseFontSize;
+          final double headerSize = isTiny ? 10 : baseFontSize + 4;
 
-          return pw.Padding(
-            padding: const pw.EdgeInsets.all(4),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                if (logoBytes != null)
+          return pw.Center(
+            child: pw.SizedBox(
+              width: widthMm >= 70 ? 54 * PdfPageFormat.mm : 44 * PdfPageFormat.mm,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  if (logoBytes != null)
+                    pw.Center(
+                      child: pw.Container(
+                        margin: const pw.EdgeInsets.only(bottom: 2),
+                        width: isTiny ? 20 : (widthMm >= 70 ? 30 : 25),
+                        height: isTiny ? 6 : (widthMm >= 70 ? 12 : 10),
+                        child: pw.Image(
+                          pw.MemoryImage(logoBytes),
+                          fit: pw.BoxFit.contain,
+                        ),
+                      ),
+                    ),
                   pw.Center(
-                    child: pw.Container(
-                      margin: const pw.EdgeInsets.only(bottom: 5),
-                      height: isTiny ? 30 : 50,
-                      child: pw.Image(pw.MemoryImage(logoBytes)),
+                    child: pw.Text(
+                      widget.storeName,
+                      textAlign: pw.TextAlign.center,
+                      style: pw.TextStyle(
+                        fontSize: headerSize,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
                     ),
                   ),
-                pw.Center(
-                  child: pw.Text(
-                    widget.storeName,
-                    style: pw.TextStyle(
-                      fontSize: headerSize,
-                      fontWeight: pw.FontWeight.bold,
+                  pw.Center(
+                    child: pw.Text(
+                      'Sales Receipt',
+                      style: pw.TextStyle(
+                        fontSize: fontSize,
+                        fontStyle: pw.FontStyle.italic,
+                      ),
                     ),
                   ),
-                ),
-                pw.Center(child: pw.Text('Sales Receipt', style: pw.TextStyle(fontSize: fontSize))),
-                pw.SizedBox(height: 6),
-                _pdfRow('Sale No', widget.saleNo, fontSize: fontSize),
-                if (!isTiny) _pdfRow('Customer', widget.customerName, fontSize: fontSize),
-                _pdfRow('Date', DateTime.now().toString().substring(0, 16), fontSize: fontSize),
-                pw.Divider(thickness: 0.5),
+                  pw.SizedBox(height: 8),
+                  _pdfRow('Sale No', widget.saleNo, fontSize: fontSize),
+                  if (!isTiny)
+                    _pdfRow('Customer', widget.customerName, fontSize: fontSize),
+                  _pdfRow('Date', DateTime.now().toString().substring(0, 16),
+                      fontSize: fontSize),
+                  pw.Divider(thickness: 0.5),
+                  ...widget.cart.map((item) {
+                    final name = item['name'].toString();
+                    final qty = _toDouble(item['qty']);
+                    final price = _toDouble(item['price']);
+                    final lineTotal = qty * price;
+                    final isWeighted = item['is_weighted'] == true;
+                    final unitName = item['unit_name']?.toString() ??
+                        (isWeighted ? 'kg' : 'pcs');
+                    final qtyText = isWeighted
+                        ? qty.toStringAsFixed(3)
+                        : qty.toInt().toString();
 
-                ...widget.cart.map((item) {
-                  final name = item['name'].toString();
-                  final qty = _toDouble(item['qty']);
-                  final price = _toDouble(item['price']);
-                  final lineTotal = qty * price;
-                  final isWeighted = item['is_weighted'] == true;
-                  final unitName = item['unit_name']?.toString() ?? (isWeighted ? 'kg' : 'pcs');
-                  final qtyText = isWeighted ? qty.toStringAsFixed(3) : qty.toInt().toString();
-
-                  return pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(name, style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold)),
-                      _pdfRow('$qtyText $unitName x ${money(price)}', money(lineTotal), fontSize: fontSize),
-                      pw.SizedBox(height: 2),
-                    ],
-                  );
-                }),
-
-                pw.Divider(thickness: 0.5),
-                _pdfRow('Subtotal', money(widget.subtotal), fontSize: fontSize),
-                _pdfRow('Discount', money(widget.discount), fontSize: fontSize),
-                _pdfRow('Tax ${widget.taxRate.toStringAsFixed(0)}%', money(widget.tax), fontSize: fontSize),
-                pw.Divider(thickness: 0.5),
-                _pdfRow('Total', money(widget.total), bold: true, fontSize: isTiny ? fontSize : fontSize + 2),
-                _pdfRow('Paid', money(widget.paid), fontSize: fontSize),
-                if (widget.paymentMethod == 'Cash') _pdfRow('Change', money(widget.change), fontSize: fontSize),
-                pw.SizedBox(height: 8),
-                if (widget.storeAddress.isNotEmpty)
-                  pw.Center(child: pw.Text(widget.storeAddress, style: pw.TextStyle(fontSize: fontSize - 1))),
-                if (widget.storePhone.isNotEmpty)
-                  pw.Center(child: pw.Text('Phone: ${widget.storePhone}', style: pw.TextStyle(fontSize: fontSize - 1))),
-                pw.SizedBox(height: 4),
-                pw.Center(child: pw.Text(widget.receiptFooter, style: pw.TextStyle(fontSize: fontSize - 1))),
-              ],
+                    return pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(name,
+                            style: pw.TextStyle(
+                                fontSize: fontSize,
+                                fontWeight: pw.FontWeight.bold)),
+                        _pdfRow('$qtyText $unitName x ${money(price)}',
+                            money(lineTotal),
+                            fontSize: fontSize),
+                        pw.SizedBox(height: 2),
+                      ],
+                    );
+                  }),
+                  pw.Divider(thickness: 0.5),
+                  _pdfRow('Subtotal', money(widget.subtotal),
+                      fontSize: fontSize),
+                  _pdfRow('Discount', money(widget.discount),
+                      fontSize: fontSize),
+                  _pdfRow('Tax ${widget.taxRate.toStringAsFixed(0)}%',
+                      money(widget.tax),
+                      fontSize: fontSize),
+                  pw.Divider(thickness: 0.5),
+                  _pdfRow('Total', money(widget.total),
+                      bold: true,
+                      fontSize: isTiny ? fontSize : fontSize + 2),
+                  _pdfRow('Paid', money(widget.paid), fontSize: fontSize),
+                  if (widget.paymentMethod == 'Cash')
+                    _pdfRow('Change', money(widget.change), fontSize: fontSize),
+                  pw.SizedBox(height: 8),
+                  if (widget.storeAddress.isNotEmpty)
+                    pw.Center(
+                      child: pw.Text(
+                        widget.storeAddress,
+                        textAlign: pw.TextAlign.center,
+                        style: pw.TextStyle(fontSize: fontSize - 1),
+                      ),
+                    ),
+                  if (widget.storePhone.isNotEmpty)
+                    pw.Center(
+                      child: pw.Text(
+                        'Phone: ${widget.storePhone}',
+                        textAlign: pw.TextAlign.center,
+                        style: pw.TextStyle(fontSize: fontSize - 1),
+                      ),
+                    ),
+                  pw.SizedBox(height: 6),
+                  pw.Center(
+                    child: pw.Text(
+                      widget.receiptFooter,
+                      textAlign: pw.TextAlign.center,
+                      style: pw.TextStyle(
+                          fontSize: fontSize - 1,
+                          fontWeight: pw.FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -592,108 +742,126 @@ class _ReceiptCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(context),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Column(
-              children: [
-                if (logoUrl.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Image.network(
-                      logoUrl,
-                      height: 48,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const SizedBox.shrink(),
+    final provider = context.watch<PrintingProvider>();
+    final widthMm = provider.paperWidthMm;
+    
+    // Scale the card width based on paper size to give a "preview" feel
+    double cardWidth;
+    if (widthMm <= 44) {
+      cardWidth = 240;
+    } else if (widthMm <= 58) {
+      cardWidth = 300;
+    } else if (widthMm <= 70 || widthMm <= 72) {
+      cardWidth = 350;
+    } else {
+      cardWidth = double.infinity;
+    }
+
+    return Center(
+      child: Container(
+        width: cardWidth,
+        padding: const EdgeInsets.all(16),
+        decoration: _cardDecoration(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Column(
+                children: [
+                  if (logoUrl.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Image.network(
+                        logoUrl,
+                        height: widthMm >= 70 ? 24 : 18,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const SizedBox.shrink(),
+                      ),
+                    ),
+                  Text(
+                    storeName,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: widthMm >= 70 ? 20 : 18,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                Text(
-                  storeName,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
+                  Text(
+                    'Sales Receipt',
+                    style: TextStyle(
+                      color: Theme.of(context).hintColor,
+                      fontSize: 12,
+                    ),
                   ),
-                ),
-                Text(
-                  'Sales Receipt',
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _InfoRow(label: 'Sale No', value: saleNo),
+            _InfoRow(label: 'Customer', value: customerName),
+            _InfoRow(label: 'Payment', value: paymentMethod),
+            const Divider(),
+
+            ...cart.map((item) {
+              final qty = _toDouble(item['qty']);
+              final price = _toDouble(item['price']);
+              final lineTotal = qty * price;
+              final isWeighted = item['is_weighted'] == true;
+              final unitName = item['unit_name']?.toString() ?? (isWeighted ? 'kg' : 'pcs');
+              final qtyText = isWeighted ? qty.toStringAsFixed(3) : qty.toInt().toString();
+
+              return _InfoRow(
+                label: '${item['name']} ($qtyText $unitName)',
+                value: money(lineTotal),
+              );
+            }),
+
+            const Divider(),
+            _InfoRow(label: 'Subtotal', value: money(subtotal)),
+            _InfoRow(label: 'Discount', value: money(discount)),
+            _InfoRow(label: 'Tax ${taxRate.toStringAsFixed(0)}%', value: money(tax)),
+            _InfoRow(label: 'Total', value: money(total), strong: true),
+            _InfoRow(label: 'Paid', value: money(paid)),
+            if (paymentMethod == 'Cash')
+              _InfoRow(label: 'Change', value: money(change)),
+            if (paymentMethod == 'Credit')
+              _InfoRow(label: 'Credit', value: money(creditAmount)),
+            const Divider(),
+            if (storeAddress.isNotEmpty)
+              Center(
+                child: Text(
+                  storeAddress,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Theme.of(context).hintColor,
                     fontSize: 12,
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _InfoRow(label: 'Sale No', value: saleNo),
-          _InfoRow(label: 'Customer', value: customerName),
-          _InfoRow(label: 'Payment', value: paymentMethod),
-          const Divider(),
-
-          ...cart.map((item) {
-            final qty = _toDouble(item['qty']);
-            final price = _toDouble(item['price']);
-            final lineTotal = qty * price;
-            final isWeighted = item['is_weighted'] == true;
-            final unitName = item['unit_name']?.toString() ?? (isWeighted ? 'kg' : 'pcs');
-            final qtyText = isWeighted ? qty.toStringAsFixed(3) : qty.toInt().toString();
-
-            return _InfoRow(
-              label: '${item['name']} ($qtyText $unitName)',
-              value: money(lineTotal),
-            );
-          }),
-
-          const Divider(),
-          _InfoRow(label: 'Subtotal', value: money(subtotal)),
-          _InfoRow(label: 'Discount', value: money(discount)),
-          _InfoRow(label: 'Tax ${taxRate.toStringAsFixed(0)}%', value: money(tax)),
-          _InfoRow(label: 'Total', value: money(total), strong: true),
-          _InfoRow(label: 'Paid', value: money(paid)),
-          if (paymentMethod == 'Cash')
-            _InfoRow(label: 'Change', value: money(change)),
-          if (paymentMethod == 'Credit')
-            _InfoRow(label: 'Credit', value: money(creditAmount)),
-          const Divider(),
-          if (storeAddress.isNotEmpty)
+              ),
+            if (storePhone.isNotEmpty)
+              Center(
+                child: Text(
+                  'Phone: $storePhone',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Theme.of(context).hintColor,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 4),
             Center(
               child: Text(
-                storeAddress,
+                receiptFooter,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Theme.of(context).hintColor,
-                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-          if (storePhone.isNotEmpty)
-            Center(
-              child: Text(
-                'Phone: $storePhone',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Theme.of(context).hintColor,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          const SizedBox(height: 4),
-          Center(
-            child: Text(
-              receiptFooter,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).hintColor,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

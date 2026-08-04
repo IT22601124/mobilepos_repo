@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mpos/utils/custom_snackbar.dart';
 import 'package:mpos/dio_client/dio_client.dart';
+import 'package:mpos/provider/connectivity_provider.dart';
+import 'package:mpos/provider/sync_provider.dart';
 import 'package:mpos/resources/api_routes.dart';
 import 'package:mpos/utils/app_back_scope.dart';
+import 'package:provider/provider.dart';
+
+import '../../database/database_helper.dart';
 
 class PosPaymentScreen extends StatefulWidget {
   final double subtotal;
@@ -300,15 +305,15 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
     setState(() => isSubmitting = true);
 
     try {
+      final isOnline = context.read<ConnectivityProvider>().isOnline;
+      final syncProvider = context.read<SyncProvider>();
+      
       final payload = _salePayload();
-      final response = await _dio.post(ApiRoutes.posSales, data: payload);
-      final data = _asMap(response.data);
-      final sale = _asMap(data['pos_sale']);
-      final saleNo =
-          sale['sale_no']?.toString() ??
-          payload['sale_no']?.toString() ??
-          'POS-${DateTime.now().millisecondsSinceEpoch}';
-      final storeProfile = await _loadStoreProfileForReceipt();
+      
+      await syncProvider.processSale(payload, isOnline);
+
+      final saleNo = 'POS-${DateTime.now().millisecondsSinceEpoch}';
+      final storeProfile = await DatabaseHelper().getStoreProfile();
 
       if (!mounted) return;
       context.go(
@@ -410,28 +415,6 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
       default:
         return 'cash';
     }
-  }
-
-  Future<Map<String, dynamic>> _loadStoreProfileForReceipt() async {
-    try {
-      final response = await _dio.get(ApiRoutes.storeProfile);
-      final data = _asMap(response.data);
-      return _extractStoreProfile(data);
-    } catch (_) {
-      return {};
-    }
-  }
-
-  Map<String, dynamic> _extractStoreProfile(Map<String, dynamic> payload) {
-    for (final key in ['store_profile', 'storeProfile', 'profile', 'data']) {
-      final value = _asMap(payload[key]);
-      if (value.isNotEmpty) return value;
-    }
-    if (payload.containsKey('store_name') ||
-        payload.containsKey('legal_name')) {
-      return payload;
-    }
-    return {};
   }
 
   List<Map<String, dynamic>> _extractRows(dynamic payload) {
