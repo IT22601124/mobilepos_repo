@@ -1522,7 +1522,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Edit $title',
+                  '${context.tr('edit')} $title',
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 10),
@@ -1557,7 +1557,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
                       }
                     },
                     icon: const Icon(Icons.save_outlined),
-                    label: const Text('Save settings'),
+                    label: Text(context.tr('save_settings')),
                   ),
                 ),
               ],
@@ -1691,12 +1691,12 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(record == null ? 'Add ${resource.tab}' : 'Update ${resource.tab}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-                              Text(resource.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
+                              Text(record == null ? '${context.tr('add')} ${context.tr(resource.tab.toLowerCase().replaceAll(' ', '_'))}' : '${context.tr('update')} ${context.tr(resource.tab.toLowerCase().replaceAll(' ', '_'))}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+                              Text(context.tr('${resource.tab.toLowerCase().replaceAll(' ', '_')}_subtitle'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
                             ],
                           ),
                         ),
-                        IconButton(tooltip: 'Close', onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                        IconButton(tooltip: context.tr('close'), onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
                       ],
                     ),
                   ),
@@ -1723,12 +1723,12 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
                           final data = <String, dynamic>{};
                           for (final field in resource.fields) {
                             final value = controllers[field.key]!.text.trim();
-                            if (field.required && value.isEmpty) { _showSnack('${field.label} is required', isError: true); return; }
+                            if (field.required && value.isEmpty) { _showSnack('${context.tr(field.key.toLowerCase())} ${context.tr('is_required_lower')}', isError: true); return; }
                             if (value.isNotEmpty) data[field.key] = _fieldValue(field, value);
                           }
                           _saveRecord(resource, record, data);
                         },
-                        icon: const Icon(Icons.save_outlined), label: Text(record == null ? 'Save' : 'Update'),
+                        icon: const Icon(Icons.save_outlined), label: Text(record == null ? context.tr('save') : context.tr('update')),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Theme.of(context).colorScheme.primary,
                           foregroundColor: Theme.of(context).colorScheme.onPrimary,
@@ -1917,8 +1917,14 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
                       _SectionTitle(title: resource.tab),
                       const SizedBox(height: 12),
                       ManagementOptionCard(
-                        icon: resource.icon, title: resource.title, subtitle: resource.subtitle,
-                        value: resource.kind == _ResourceKind.report ? '9 reports' : resource.kind == _ResourceKind.settings ? 'Configure' : '${_records.length} rows',
+                        icon: resource.icon,
+                        title: context.tr(resource.tab.toLowerCase().replaceAll(' ', '_')),
+                        subtitle: context.tr('${resource.tab.toLowerCase().replaceAll(' ', '_')}_subtitle'),
+                        value: resource.kind == _ResourceKind.report
+                            ? '9 ${context.tr('reports')}'
+                            : resource.kind == _ResourceKind.settings
+                                ? context.tr('settings')
+                                : '${_records.length} ${context.tr('rows')}',
                         color: resource.color,
                       ),
                       if (_error != null) _ApiNotice(message: _error!),
@@ -1944,7 +1950,8 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () => _showForm(resource), icon: const Icon(Icons.add), label: Text('Add ${resource.tab}'),
+            onPressed: () => _showForm(resource), icon: const Icon(Icons.add),
+            label: Text('${context.tr('add')} ${context.tr(resource.tab.toLowerCase().replaceAll(' ', '_'))}'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.primary, foregroundColor: Theme.of(context).colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -1953,7 +1960,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         ),
         const SizedBox(height: 12),
       ],
-      if (!_isLoading && _records.isEmpty) _EmptyCard(title: 'No ${resource.tab.toLowerCase()} found', subtitle: 'Pull to refresh or add a new record.'),
+      if (!_isLoading && _records.isEmpty) _EmptyCard(title: '${context.tr('no')} ${context.tr(resource.tab.toLowerCase().replaceAll(' ', '_'))} ${context.tr('found')}', subtitle: context.tr('pull_to_refresh_or_add')),
       ..._records.map((record) => _ResourceActionCard(
         icon: resource.icon, title: _titleFor(record), subtitle: _subtitleFor(record), trailing: _trailingFor(record),
         onView: () => _showDetails(resource, record),

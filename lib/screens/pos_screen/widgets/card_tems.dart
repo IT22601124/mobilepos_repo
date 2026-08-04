@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 class CartItem extends StatelessWidget {
@@ -88,7 +89,7 @@ class CartItem extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'LKR ${item['price'].toStringAsFixed(0)} each',
+                      'LKR ${item['price'].toStringAsFixed(0)} ${context.tr('each')}',
                       style: TextStyle(
                         color: colorScheme.onSurface.withValues(alpha: 0.6),
                         fontSize: 12,

@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:mpos/utils/custom_snackbar.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -124,7 +125,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen> {
         setState(() => _profile = profile);
         _fillForm(profile);
       }
-      _showSnack('Store profile saved');
+      _showSnack(context.tr('store_profile_saved'));
     } catch (error) {
       _showSnack(_messageFor(error), isError: true);
     } finally {
@@ -159,7 +160,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen> {
       } else {
         await _loadProfile();
       }
-      _showSnack('Store logo uploaded');
+      _showSnack(context.tr('store_logo_uploaded'));
     } catch (error) {
       _showSnack(_messageFor(error), isError: true);
     } finally {
@@ -239,9 +240,9 @@ class _StoreManagementScreenState extends State<StoreManagementScreen> {
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          title: const Text(
-            'Store Management',
-            style: TextStyle(fontWeight: FontWeight.w900),
+          title: Text(
+            context.tr('store_management'),
+            style: const TextStyle(fontWeight: FontWeight.w900),
           ),
         ),
         body: SafeArea(
@@ -259,65 +260,65 @@ class _StoreManagementScreenState extends State<StoreManagementScreen> {
                       ),
                       const SizedBox(height: 12),
                       _SectionCard(
-                        title: 'Store Details',
+                        title: context.tr('store_details'),
                         children: [
                           _StoreField(
-                            label: 'Store name',
+                            label: context.tr('store_name'),
                             controller: _storeNameController,
                             required: true,
                           ),
                           _StoreField(
-                            label: 'Legal name',
+                            label: context.tr('legal_name'),
                             controller: _legalNameController,
                           ),
                           _StoreField(
-                            label: 'Address line 1',
+                            label: context.tr('address'),
                             controller: _addressLine1Controller,
                             required: true,
                           ),
                           _StoreField(
-                            label: 'Address line 2',
+                            label: '',
                             controller: _addressLine2Controller,
                           ),
                           _StoreField(
-                            label: 'City',
+                            label: context.tr('city'),
                             controller: _cityController,
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
                       _SectionCard(
-                        title: 'Contact And Receipt',
+                        title: context.tr('contact_receipt'),
                         children: [
                           _StoreField(
-                            label: 'Phone',
+                            label: context.tr('phone'),
                             controller: _phoneController,
                             keyboardType: TextInputType.phone,
                           ),
                           _StoreField(
-                            label: 'Email',
+                            label: context.tr('email'),
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                           ),
                           _StoreField(
-                            label: 'Tax number',
+                            label: context.tr('tax_number'),
                             controller: _taxNumberController,
                           ),
                           _StoreField(
-                            label: 'Currency code',
+                            label: context.tr('currency'),
                             controller: _currencyCodeController,
                             required: true,
                           ),
                           _StoreField(
-                            label: 'Receipt footer',
+                            label: context.tr('receipt_footer'),
                             controller: _receiptFooterController,
                             maxLines: 3,
                           ),
                           SwitchListTile(
                             contentPadding: EdgeInsets.zero,
-                            title: const Text(
-                              'Active',
-                              style: TextStyle(fontWeight: FontWeight.w900),
+                            title: Text(
+                              context.tr('active'),
+                              style: const TextStyle(fontWeight: FontWeight.w900),
                             ),
                             value: _status,
                             onChanged: (value) =>
@@ -338,7 +339,7 @@ class _StoreManagementScreenState extends State<StoreManagementScreen> {
                               )
                             : const Icon(Icons.save_outlined),
                         label: Text(
-                          _profile == null ? 'Create Store' : 'Save Store',
+                          _profile == null ? context.tr('create_store') : context.tr('save_store'),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Theme.of(context).colorScheme.primary,
@@ -404,7 +405,7 @@ class _LogoCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Store Logo',
+                  context.tr('store_logo'),
                   style: TextStyle(
                     fontWeight: FontWeight.w900,
                     color: Theme.of(context).colorScheme.onSurface,
@@ -420,7 +421,7 @@ class _LogoCard extends StatelessWidget {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.upload_file_outlined, size: 18),
-                  label: const Text('Upload'),
+                  label: Text(context.tr('upload')),
                 ),
               ],
             ),
@@ -486,7 +487,7 @@ class _StoreField extends StatelessWidget {
         validator: required
             ? (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return '$label is required';
+                  return context.tr('required_field');
                 }
                 return null;
               }

@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
@@ -147,17 +148,17 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
           height: isTiny ? PosTextSize.size1 : PosTextSize.size2,
           width: isTiny ? PosTextSize.size1 : PosTextSize.size2,
         ));
-    bytes += generator.text('Sales Receipt',
+    bytes += generator.text(context.tr('sales_receipt'),
         styles: const PosStyles(align: PosAlign.center));
     bytes += generator.feed(1);
 
     // Info
-    bytes += generator.text('Sale: ${widget.saleNo}');
+    bytes += generator.text('${context.tr('sale_no')}: ${widget.saleNo}');
     if (!isTiny) {
-      bytes += generator.text('Customer: ${widget.customerName}');
-      bytes += generator.text('Payment: ${widget.paymentMethod}');
+      bytes += generator.text('${context.tr('customer')}: ${widget.customerName}');
+      bytes += generator.text('${context.tr('payment')}: ${widget.paymentMethod}');
     }
-    bytes += generator.text('Date: ${DateTime.now().toString().substring(0, 16)}');
+    bytes += generator.text('${context.tr('date')}: ${DateTime.now().toString().substring(0, 16)}');
     bytes += generator.hr();
 
     // Items
@@ -203,19 +204,19 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
       }
     }
 
-    addRow('Subtotal', widget.subtotal);
-    addRow('Discount', widget.discount);
-    addRow('Tax ${widget.taxRate.toStringAsFixed(0)}%', widget.tax);
+    addRow(context.tr('subtotal'), widget.subtotal);
+    addRow(context.tr('discount'), widget.discount);
+    addRow('${context.tr('tax')} ${widget.taxRate.toStringAsFixed(0)}%', widget.tax);
     
     bytes += generator.hr();
     
     if (isTiny) {
-      bytes += generator.text('TOTAL: ${money(widget.total)}', 
+      bytes += generator.text('${context.tr('total_caps')}: ${money(widget.total)}', 
           styles: const PosStyles(align: PosAlign.right, bold: true));
     } else {
       bytes += generator.row([
         PosColumn(
-            text: 'TOTAL',
+            text: context.tr('total_caps'),
             width: 7,
             styles: const PosStyles(bold: true, height: PosTextSize.size2)),
         PosColumn(
@@ -227,11 +228,11 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
     }
 
     bytes += generator.feed(1);
-    bytes += generator.text('Paid: ${money(widget.paid)}',
+    bytes += generator.text('${context.tr('paid')}: ${money(widget.paid)}',
         styles: const PosStyles(align: PosAlign.right));
     
     if (widget.paymentMethod == 'Cash') {
-      bytes += generator.text('Change: ${money(widget.change)}',
+      bytes += generator.text('${context.tr('change')}: ${money(widget.change)}',
           styles: const PosStyles(align: PosAlign.right));
     }
 
@@ -241,7 +242,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
           styles: const PosStyles(align: PosAlign.center));
     }
     if (widget.storePhone.isNotEmpty) {
-      bytes += generator.text('Phone: ${widget.storePhone}',
+      bytes += generator.text('${context.tr('phone')}: ${widget.storePhone}',
           styles: const PosStyles(align: PosAlign.center));
     }
     
@@ -270,6 +271,18 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
     final provider = context.read<PrintingProvider>();
     final widthMm = provider.paperWidthMm;
     final isTiny = widthMm < 44;
+
+    final String trReceipt = context.tr('sales_receipt');
+    final String trSaleNo = context.tr('sale_no');
+    final String trCustomer = context.tr('customer');
+    final String trDate = context.tr('date');
+    final String trSubtotal = context.tr('subtotal');
+    final String trDiscount = context.tr('discount');
+    final String trTax = context.tr('tax');
+    final String trTotal = context.tr('total');
+    final String trPaid = context.tr('paid');
+    final String trChange = context.tr('change');
+    final String trPhone = context.tr('phone');
 
     PdfPageFormat format;
     if (widthMm == 30) {
@@ -315,11 +328,11 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
                     ),
                   ),
                 ),
-                pw.Center(child: pw.Text('Sales Receipt', style: pw.TextStyle(fontSize: fontSize))),
+                pw.Center(child: pw.Text(trReceipt, style: pw.TextStyle(fontSize: fontSize))),
                 pw.SizedBox(height: 6),
-                _pdfRow('Sale No', widget.saleNo, fontSize: fontSize),
-                if (!isTiny) _pdfRow('Customer', widget.customerName, fontSize: fontSize),
-                _pdfRow('Date', DateTime.now().toString().substring(0, 16), fontSize: fontSize),
+                _pdfRow(trSaleNo, widget.saleNo, fontSize: fontSize),
+                if (!isTiny) _pdfRow(trCustomer, widget.customerName, fontSize: fontSize),
+                _pdfRow(trDate, DateTime.now().toString().substring(0, 16), fontSize: fontSize),
                 pw.Divider(thickness: 0.5),
 
                 ...widget.cart.map((item) {
@@ -342,18 +355,18 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
                 }),
 
                 pw.Divider(thickness: 0.5),
-                _pdfRow('Subtotal', money(widget.subtotal), fontSize: fontSize),
-                _pdfRow('Discount', money(widget.discount), fontSize: fontSize),
-                _pdfRow('Tax ${widget.taxRate.toStringAsFixed(0)}%', money(widget.tax), fontSize: fontSize),
+                _pdfRow(trSubtotal, money(widget.subtotal), fontSize: fontSize),
+                _pdfRow(trDiscount, money(widget.discount), fontSize: fontSize),
+                _pdfRow('$trTax ${widget.taxRate.toStringAsFixed(0)}%', money(widget.tax), fontSize: fontSize),
                 pw.Divider(thickness: 0.5),
-                _pdfRow('Total', money(widget.total), bold: true, fontSize: isTiny ? fontSize : fontSize + 2),
-                _pdfRow('Paid', money(widget.paid), fontSize: fontSize),
-                if (widget.paymentMethod == 'Cash') _pdfRow('Change', money(widget.change), fontSize: fontSize),
+                _pdfRow(trTotal, money(widget.total), bold: true, fontSize: isTiny ? fontSize : fontSize + 2),
+                _pdfRow(trPaid, money(widget.paid), fontSize: fontSize),
+                if (widget.paymentMethod == 'Cash') _pdfRow(trChange, money(widget.change), fontSize: fontSize),
                 pw.SizedBox(height: 8),
                 if (widget.storeAddress.isNotEmpty)
                   pw.Center(child: pw.Text(widget.storeAddress, style: pw.TextStyle(fontSize: fontSize - 1))),
                 if (widget.storePhone.isNotEmpty)
-                  pw.Center(child: pw.Text('Phone: ${widget.storePhone}', style: pw.TextStyle(fontSize: fontSize - 1))),
+                  pw.Center(child: pw.Text('$trPhone: ${widget.storePhone}', style: pw.TextStyle(fontSize: fontSize - 1))),
                 pw.SizedBox(height: 4),
                 pw.Center(child: pw.Text(widget.receiptFooter, style: pw.TextStyle(fontSize: fontSize - 1))),
               ],
@@ -430,7 +443,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
 
             Center(
               child: Text(
-                'Payment Successful',
+                context.tr('payment_success'),
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
@@ -483,7 +496,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
                   child: OutlinedButton.icon(
                     onPressed: sharePdfReceipt,
                     icon: const Icon(Icons.share_rounded),
-                    label: const Text('Share'),
+                    label: Text(context.tr('share')),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -495,7 +508,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
                   child: OutlinedButton.icon(
                     onPressed: () => printReceipt(context),
                     icon: const Icon(Icons.file_download_outlined),
-                    label: const Text('Download'),
+                    label: Text(context.tr('download')),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -529,7 +542,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
             TextButton.icon(
               onPressed: () => context.go('/pos_terminal'),
               icon: const Icon(Icons.point_of_sale),
-              label: const Text('Start New Sale'),
+              label: Text(context.tr('start_new_sale')),
               style: TextButton.styleFrom(
                 foregroundColor: colorScheme.primary,
               ),
@@ -620,7 +633,7 @@ class _ReceiptCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'Sales Receipt',
+                  context.tr('sales_receipt'),
                   style: TextStyle(
                     color: Theme.of(context).hintColor,
                     fontSize: 12,
@@ -630,9 +643,9 @@ class _ReceiptCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _InfoRow(label: 'Sale No', value: saleNo),
-          _InfoRow(label: 'Customer', value: customerName),
-          _InfoRow(label: 'Payment', value: paymentMethod),
+          _InfoRow(label: context.tr('sale_no'), value: saleNo),
+          _InfoRow(label: context.tr('customer'), value: customerName),
+          _InfoRow(label: context.tr('payment'), value: paymentMethod),
           const Divider(),
 
           ...cart.map((item) {
@@ -650,15 +663,15 @@ class _ReceiptCard extends StatelessWidget {
           }),
 
           const Divider(),
-          _InfoRow(label: 'Subtotal', value: money(subtotal)),
-          _InfoRow(label: 'Discount', value: money(discount)),
-          _InfoRow(label: 'Tax ${taxRate.toStringAsFixed(0)}%', value: money(tax)),
-          _InfoRow(label: 'Total', value: money(total), strong: true),
-          _InfoRow(label: 'Paid', value: money(paid)),
+          _InfoRow(label: context.tr('subtotal'), value: money(subtotal)),
+          _InfoRow(label: context.tr('discount'), value: money(discount)),
+          _InfoRow(label: '${context.tr('tax')} ${taxRate.toStringAsFixed(0)}%', value: money(tax)),
+          _InfoRow(label: context.tr('total'), value: money(total), strong: true),
+          _InfoRow(label: context.tr('paid'), value: money(paid)),
           if (paymentMethod == 'Cash')
-            _InfoRow(label: 'Change', value: money(change)),
+            _InfoRow(label: context.tr('change'), value: money(change)),
           if (paymentMethod == 'Credit')
-            _InfoRow(label: 'Credit', value: money(creditAmount)),
+            _InfoRow(label: context.tr('credit'), value: money(creditAmount)),
           const Divider(),
           if (storeAddress.isNotEmpty)
             Center(
@@ -674,7 +687,7 @@ class _ReceiptCard extends StatelessWidget {
           if (storePhone.isNotEmpty)
             Center(
               child: Text(
-                'Phone: $storePhone',
+                '${context.tr('phone')}: $storePhone',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Theme.of(context).hintColor,

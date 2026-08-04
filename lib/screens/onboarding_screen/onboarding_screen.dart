@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mpos/provider/onboarding_provider.dart';
@@ -14,22 +15,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  final List<OnboardingItem> _pages = [
+  List<OnboardingItem> get _pages => [
     OnboardingItem(
-      title: 'Fast & Easy POS',
-      subtitle: 'Complete sales in seconds with our intuitive terminal designed for speed.',
+      title: context.tr('onboarding_title_1'),
+      subtitle: context.tr('onboarding_subtitle_1'),
       icon: Icons.point_of_sale_rounded,
       color: const Color(0xFF2563EB),
     ),
     OnboardingItem(
-      title: 'Inventory Control',
-      subtitle: 'Keep track of stock levels, movement history, and low-stock alerts automatically.',
+      title: context.tr('onboarding_title_2'),
+      subtitle: context.tr('onboarding_subtitle_2'),
       icon: Icons.inventory_2_rounded,
       color: const Color(0xFF10B981),
     ),
     OnboardingItem(
-      title: 'Smart Analytics',
-      subtitle: 'Gain insights into your business performance with real-time reports and charts.',
+      title: context.tr('onboarding_title_3'),
+      subtitle: context.tr('onboarding_subtitle_3'),
       icon: Icons.bar_chart_rounded,
       color: const Color(0xFF8B5CF6),
     ),
@@ -68,7 +69,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: TextButton(
                 onPressed: _complete,
                 child: Text(
-                  'Skip',
+                  context.tr('skip'),
                   style: TextStyle(
                     color: colorScheme.onSurface.withValues(alpha: 0.5),
                     fontWeight: FontWeight.w600,
@@ -165,7 +166,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                       ),
                       child: Text(
-                        _currentPage == _pages.length - 1 ? 'Get Started' : 'Next',
+                        _currentPage == _pages.length - 1 ? context.tr('get_started') : context.tr('next'),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,

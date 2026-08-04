@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 class WeightInputDialog extends StatefulWidget {
@@ -60,7 +61,7 @@ class _WeightInputDialogState extends State<WeightInputDialog> {
     if (weight != null && weight > 0) {
       if (weight > widget.stockAvailable) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Insufficient stock. Max available: ${widget.stockAvailable} ${widget.unitName}')),
+          SnackBar(content: Text('${context.tr('insufficient_stock')}: ${widget.stockAvailable} ${widget.unitName}')),
         );
         return;
       }
@@ -87,7 +88,7 @@ class _WeightInputDialogState extends State<WeightInputDialog> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Enter weight in ${widget.unitName}',
+              '${context.tr('enter_weight')} ${widget.unitName}',
               style: TextStyle(color: theme.hintColor, fontSize: 13),
             ),
             const SizedBox(height: 20),
@@ -147,7 +148,7 @@ class _WeightInputDialogState extends State<WeightInputDialog> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('CLEAR'),
+                    child: Text(context.tr('clear')),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -161,7 +162,7 @@ class _WeightInputDialogState extends State<WeightInputDialog> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('ADD TO CART', style: TextStyle(fontWeight: FontWeight.w900)),
+                    child: Text(context.tr('add_to_cart'), style: const TextStyle(fontWeight: FontWeight.w900)),
                   ),
                 ),
               ],

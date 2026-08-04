@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mpos/utils/custom_snackbar.dart';
@@ -48,7 +49,7 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
       );
       await authProvider.createAccount(user);
       if (!mounted) return;
-      CustomSnackBar.success(context, 'Account ready. Sign in to continue.');
+      CustomSnackBar.success(context, context.tr('account_ready'));
       context.go('/login');
     }
   }
@@ -91,7 +92,7 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
             SizedBox(height: 8),
             Center(
               child: Text(
-                "Create Account",
+                context.tr('create_account'),
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -116,11 +117,11 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text("FULL NAME",
+                Text(context.tr('full_name').toUpperCase(),
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: color.onSurface.withOpacity(0.6))),
+                        color: color.onSurface.withValues(alpha: 0.6))),
 
                 const SizedBox(height: 8),
 
@@ -130,7 +131,7 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
                   buildInput("e.g. Alex Mercer", Icons.person),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Enter full name';
+                      return context.tr('enter_full_name');
                     }
                     return null;
                   },
@@ -138,11 +139,11 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
 
                 const SizedBox(height: 18),
 
-                Text("MOBILE NUMBER",
+                Text(context.tr('mobile_number').toUpperCase(),
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: color.onSurface.withOpacity(0.6))),
+                        color: color.onSurface.withValues(alpha: 0.6))),
 
                 const SizedBox(height: 8),
 
@@ -153,7 +154,7 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
                   buildInput("e.g. 0712345678", Icons.phone_android),
                   validator: (value) {
                     if (value == null || value.trim().length < 9) {
-                      return 'Enter valid mobile number';
+                      return context.tr('enter_valid_mobile');
                     }
                     return null;
                   },
@@ -162,11 +163,11 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
                 const SizedBox(height: 18),
 
                 // ================= EMAIL =================
-                Text("EMAIL ADDRESS",
+                Text(context.tr('email_address').toUpperCase(),
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: color.onSurface.withOpacity(0.6))),
+                        color: color.onSurface.withValues(alpha: 0.6))),
 
                 const SizedBox(height: 8),
 
@@ -177,7 +178,7 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
                   buildInput("admin@admin.com", Icons.email_outlined),
                   validator: (value) {
                     if (value == null || !value.contains('@')) {
-                      return 'Enter valid email';
+                      return context.tr('enter_valid_email');
                     }
                     return null;
                   },
@@ -186,11 +187,11 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
                 const SizedBox(height: 18),
 
                 // ================= PASSWORD =================
-                Text("TERMINAL PASSWORD",
+                Text(context.tr('terminal_password').toUpperCase(),
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: color.onSurface.withOpacity(0.6))),
+                        color: color.onSurface.withValues(alpha: 0.6))),
 
                 const SizedBox(height: 8),
 
@@ -216,7 +217,7 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.length < 6) {
-                      return 'Use at least 6 characters';
+                      return context.tr('use_6_chars');
                     }
                     return null;
                   },
@@ -225,11 +226,11 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
                 const SizedBox(height: 18),
 
                 // ================= CONFIRM PASSWORD =================
-                Text("CONFIRM PASSWORD",
+                Text(context.tr('confirm_password').toUpperCase(),
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: color.onSurface.withOpacity(0.6))),
+                        color: color.onSurface.withValues(alpha: 0.6))),
 
                 const SizedBox(height: 8),
 
@@ -237,7 +238,7 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
                   controller: _confirmPasswordController,
                   obscureText: _obscureConfirmPassword,
                   decoration: buildInput(
-                    "Verify password",
+                    context.tr('confirm_password'),
                     Icons.lock_outline,
                     suffix: IconButton(
                       icon: Icon(
@@ -256,7 +257,7 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
                   ),
                   validator: (value) {
                     if (value != _passwordController.text) {
-                      return 'Passwords do not match';
+                      return context.tr('passwords_dont_match');
                     }
                     return null;
                   },
@@ -275,7 +276,7 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
         children: [
           Consumer<AuthProvider>(
               builder: (context,authProvider,child)=>
-              MainButton(text: "Create Account", onPressed: _register,isLoading: authProvider.isLoading)),
+              MainButton(text: context.tr('create_account'), onPressed: _register,isLoading: authProvider.isLoading)),
 
           const SizedBox(height: 20),
 
@@ -283,16 +284,16 @@ class _NovaCreateAccountScreenState extends State<NovaCreateAccountScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                "Already registered? ",
+                context.tr('already_registered'),
                 style: TextStyle(
-                    color: color.onSurface.withOpacity(0.6)),
+                    color: color.onSurface.withValues(alpha: 0.6)),
               ),
               GestureDetector(
                 onTap: () {
                   context.go('/login');
                 },
                 child: Text(
-                  "Login",
+                  context.tr('login'),
                   style: TextStyle(
                     color: color.primary,
                     fontWeight: FontWeight.bold,
