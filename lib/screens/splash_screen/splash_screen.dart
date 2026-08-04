@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +25,7 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
   late Animation<double> _logoScale;
   late Animation<double> _logoOpacity;
   double _loadingProgress = 0.0;
-  String _statusText = 'Initializing security node...';
+  String? _statusText;
   Timer? _progressTimer;
   String? errorMessage;
   static const _onboardingKey = 'isonboardingscreendispaleyd';
@@ -104,12 +105,12 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
 
         // Update status subtext dynamically based on progress
         if (_loadingProgress > 0.35 && _loadingProgress < 0.70) {
-          _statusText = 'Connecting terminal gateway...';
+          _statusText = context.tr('connecting_gateway');
         } else if (_loadingProgress >= 0.70 && _loadingProgress < 0.95) {
-          _statusText = 'Decrypting merchant token...';
+          _statusText = context.tr('decrypting_token');
         } else if (_loadingProgress >= 1.0) {
           _loadingProgress = 1.0;
-          _statusText = 'Terminal Authorized!';
+          _statusText = context.tr('terminal_authorized');
           _progressTimer?.cancel();
 
           // 3. Route to Login/PIN Screen
@@ -186,8 +187,8 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      errorMessage ?? 'Smart Business, Simplified Payments',
-                      style: TextStyle(
+                      errorMessage ?? context.tr('splash_tagline'),
+                      style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: ColorResources.textSecondary, // Using ColorResources
@@ -231,7 +232,7 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
                     const SizedBox(height: 12),
                     errorMessage == null
                         ? Text(
-                            _statusText,
+                            _statusText ?? context.tr('initializing_security'),
                             style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
@@ -245,8 +246,8 @@ class _NovaSplashSelectorState extends State<NovaSplashSelector>
 
               // Footer Security Badge
               Text(
-                'PCI-DSS COMPLIANT • SECURE CONNECTION',
-                style: TextStyle(
+                context.tr('secure_connection'),
+                style: const TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.w700,
                   color: ColorResources.textSecondary, // Using ColorResources

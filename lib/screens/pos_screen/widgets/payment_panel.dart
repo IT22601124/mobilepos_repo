@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 class PaymentPanel extends StatefulWidget {
@@ -52,7 +53,7 @@ class _PaymentPanelState extends State<PaymentPanel> {
         child: SafeArea(
           top: false,
           child: Text(
-            'Select items to continue',
+            context.tr('select_items_to_continue'),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: colors.onSurface.withValues(alpha: 0.5),
@@ -96,7 +97,7 @@ class _PaymentPanelState extends State<PaymentPanel> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'TOTAL PAYABLE',
+                                context.tr('total_payable'),
                                 style: TextStyle(
                                   color: colors.onSurface.withValues(alpha: 0.5),
                                   fontSize: 10,
@@ -127,9 +128,9 @@ class _PaymentPanelState extends State<PaymentPanel> {
                           padding: EdgeInsets.symmetric(vertical: 8.0),
                           child: Divider(height: 1),
                         ),
-                        _SummaryRow(label: 'Subtotal', value: money(widget.subtotal)),
-                        _SummaryRow(label: 'Discount', value: money(widget.discount)),
-                        _SummaryRow(label: 'Tax (8%)', value: money(widget.tax)),
+                        _SummaryRow(label: context.tr('subtotal'), value: money(widget.subtotal)),
+                        _SummaryRow(label: context.tr('discount'), value: money(widget.discount)),
+                        _SummaryRow(label: '${context.tr('tax')} (8%)', value: money(widget.tax)),
                       ],
                     ],
                   ),
@@ -147,7 +148,7 @@ class _PaymentPanelState extends State<PaymentPanel> {
                       Expanded(
                         flex: 3,
                         child: _CompactField(
-                          label: 'Discount',
+                          label: context.tr('discount'),
                           icon: Icons.sell_outlined,
                           onChanged: (v) => widget.onDiscountChanged(double.tryParse(v) ?? 0),
                         ),
@@ -168,7 +169,7 @@ class _PaymentPanelState extends State<PaymentPanel> {
                     children: [
                       Expanded(
                         child: _SecondaryButton(
-                          label: 'HOLD',
+                          label: context.tr('hold'),
                           onPressed: widget.onHold,
                           icon: Icons.pause_rounded,
                         ),
@@ -177,7 +178,7 @@ class _PaymentPanelState extends State<PaymentPanel> {
                       Expanded(
                         flex: 2,
                         child: _PrimaryButton(
-                          label: 'COMPLETE SALE',
+                          label: context.tr('complete_sale'),
                           onPressed: widget.onPay,
                           icon: Icons.check_circle_rounded,
                         ),
@@ -281,7 +282,7 @@ class _CompactDropdown extends StatelessWidget {
             fontWeight: FontWeight.w700,
             fontSize: 14,
           ),
-          items: items.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+          items: items.map((m) => DropdownMenuItem(value: m, child: Text(context.tr(m.toLowerCase())))).toList(),
           onChanged: onChanged,
         ),
       ),

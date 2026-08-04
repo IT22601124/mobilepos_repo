@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mpos/dio_client/dio_client.dart';
@@ -105,25 +106,25 @@ class _DashBaordScrrenState extends State<DashBaordScrren> {
                 childAspectRatio: 1.35,
                 children: [
                   _MetricCard(
-                    title: 'Net Sales',
+                    title: context.tr('net_sales'),
                     value: _money(dashboard.metrics.netSales),
                     icon: Icons.trending_up,
                     color: const Color(0xFF10B981),
                   ),
                   _MetricCard(
-                    title: 'Collected',
+                    title: context.tr('collected'),
                     value: _money(dashboard.metrics.collected),
                     icon: Icons.payments_outlined,
                     color: const Color(0xFF3B82F6),
                   ),
                   _MetricCard(
-                    title: 'Credit Due',
+                    title: context.tr('credit_due'),
                     value: _money(dashboard.metrics.creditDue),
                     icon: Icons.credit_card,
                     color: const Color(0xFFF59E0B),
                   ),
                   _MetricCard(
-                    title: 'Items Sold',
+                    title: context.tr('items_sold'),
                     value: _number(dashboard.metrics.itemsSold),
                     icon: Icons.shopping_bag_outlined,
                     color: const Color(0xFF8B5CF6),
@@ -133,14 +134,14 @@ class _DashBaordScrrenState extends State<DashBaordScrren> {
               const SizedBox(height: 16),
               const _QuickActions(),
               const SizedBox(height: 16),
-              const _SectionTitle(title: 'Sales Overview'),
+              _SectionTitle(title: context.tr('sales_overview')),
               const SizedBox(height: 10),
               _SalesChartCard(points: dashboard.chart),
               const SizedBox(height: 16),
-              const _SectionTitle(title: 'Cashier Sales & Credit'),
+              _SectionTitle(title: context.tr('cashier_sales_credit')),
               const SizedBox(height: 10),
               if (dashboard.cashiers.isEmpty)
-                const _EmptyCard(message: 'No cashier sales found yet.')
+                _EmptyCard(message: context.tr('no_cashier_sales'))
               else
                 ...dashboard.cashiers.map(
                   (cashier) => Padding(
@@ -149,10 +150,10 @@ class _DashBaordScrrenState extends State<DashBaordScrren> {
                   ),
                 ),
               const SizedBox(height: 6),
-              const _SectionTitle(title: 'Recent Sales'),
+              _SectionTitle(title: context.tr('recent_sales_list')),
               const SizedBox(height: 10),
               if (dashboard.recentSales.isEmpty)
-                const _EmptyCard(message: 'No recent sales found yet.')
+                _EmptyCard(message: context.tr('no_recent_sales'))
               else
                 ...dashboard.recentSales.map(
                   (sale) => _RecentSaleTile(sale: sale),
@@ -373,7 +374,7 @@ class _HeaderCard extends StatelessWidget {
     final progress = (metrics.targetProgress / 100).clamp(0.0, 1.0).toDouble();
     final targetLabel = metrics.todayTarget > 0
         ? '${_money(metrics.netSales)} / ${_money(metrics.todayTarget)}'
-        : '${_money(metrics.netSales)} today';
+        : '${_money(metrics.netSales)} ${context.tr('today_sales')}';
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -389,18 +390,18 @@ class _HeaderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Good day',
-            style: TextStyle(
+          Text(
+            context.tr('good_day'),
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 22,
               fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Today sales target progress',
-            style: TextStyle(color: Colors.white70),
+          Text(
+            context.tr('sales_target_progress'),
+            style: const TextStyle(color: Colors.white70),
           ),
           const SizedBox(height: 16),
           Row(
@@ -490,20 +491,20 @@ class _QuickActions extends StatelessWidget {
       children: [
         _ActionButton(
           icon: Icons.point_of_sale,
-          label: 'Open POS',
+          label: context.tr('open_pos'),
           onTap: () => context.go('/pos_terminal'),
         ),
         const SizedBox(width: 10),
         _ActionButton(
           icon: Icons.receipt_long,
-          label: 'Reports',
-          onTap: () => context.go('/pos-management'),
+          label: context.tr('reports'),
+          onTap: () => context.go('/pos-management?tab=Reports'),
         ),
         const SizedBox(width: 10),
         _ActionButton(
           icon: Icons.inventory_2_outlined,
-          label: 'Products',
-          onTap: () => context.go('/pos-management'),
+          label: context.tr('products'),
+          onTap: () => context.go('/pos-management?tab=Products'),
         ),
       ],
     );
@@ -572,16 +573,16 @@ class _SalesChartCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Last 7 Days Sales',
-            style: TextStyle(fontWeight: FontWeight.w800),
+          Text(
+            context.tr('last_7_days'),
+            style: const TextStyle(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 20),
           Expanded(
             child: points.isEmpty
                 ? Center(
                     child: Text(
-                      'No chart data',
+                      context.tr('no_chart_data'),
                       style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                     ),
                   )
@@ -710,13 +711,13 @@ class _CashierCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _MiniValue(
-                  label: 'Collected',
+                  label: context.tr('collected'),
                   value: _money(cashier.collected),
                 ),
               ),
               Expanded(
                 child: _MiniValue(
-                  label: 'Credit',
+                  label: context.tr('credit_due'),
                   value: _money(cashier.credit),
                 ),
               ),

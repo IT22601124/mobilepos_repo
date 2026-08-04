@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
@@ -218,7 +219,7 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
     try {
       final isOnline = context.read<ConnectivityProvider>().isOnline;
       final syncProvider = context.read<SyncProvider>();
-      
+
       final data = await syncProvider.loadCatalogData(isOnline);
 
       final productRows = (data['products'] as List).cast<Map<String, dynamic>>();
@@ -244,12 +245,12 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
         taxRate = fetchedTaxRate;
         categories = ['All', ...loadedCategories];
         if (!categories.contains(selectedCategory)) selectedCategory = 'All';
-        
+
         if (data['source'] == 'local' && isOnline) {
           error = 'Loading from local cache due to API error.';
         }
       });
-      
+
       // If we are back online, trigger a queue sync
       if (isOnline) {
         syncProvider.syncQueue();
@@ -374,7 +375,7 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Order held successfully')));
+      ).showSnackBar(SnackBar(content: Text(context.tr('order_held_success'))));
 
       setState(() {
         cart.clear();
@@ -606,7 +607,7 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
                       child: Center(child: CircularProgressIndicator(strokeWidth: 3)),
                     ),
                   _SectionHeader(
-                    title: 'Current Cart',
+                    title: context.tr('current_cart'),
                     subtitle: '${cart.length} unique',
                   ),
                   const SizedBox(height: 10),
@@ -723,23 +724,13 @@ class _TerminalHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Text(
-                  'Terminal',
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              _ConnectionBadge(isOnline: isOnline),
-            ],
+           Text(
+            context.tr('terminal'),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+            ),
           ),
           Text(
             '$cartCount items • $total',
@@ -781,7 +772,7 @@ class _TerminalHeader extends StatelessWidget {
         _HeaderAction(
           icon: Icons.pause_circle_filled_rounded,
           onTap: onHeldOrders,
-          tooltip: 'Held Orders',
+          tooltip: context.tr('held_orders'),
         ),
         _HeaderAction(
           icon: isLoading ? Icons.hourglass_empty_rounded : Icons.refresh_rounded,
@@ -898,10 +889,10 @@ class _EmptyCart extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: _cardDecoration(context),
-      child: const Center(
+      child: Center(
         child: Text(
-          'No items added',
-          style: TextStyle(color: Color(0xFF6B7280)),
+          context.tr('no_items_added'),
+          style: const TextStyle(color: Color(0xFF6B7280)),
         ),
       ),
     );
@@ -961,7 +952,7 @@ class _CatalogNotice extends StatelessWidget {
               ),
             ),
           ),
-          TextButton(onPressed: onRetry, child: const Text('Retry')),
+          TextButton(onPressed: onRetry, child: Text(context.tr('retry'))),
         ],
       ),
     );
@@ -1023,12 +1014,12 @@ class _HeldOrdersSheetState extends State<_HeldOrdersSheet> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Remove held order'),
-        content: const Text('Remove this held order?'),
+        title: Text(context.tr('remove_held_order')),
+        content: Text(context.tr('remove_held_order_confirm')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.tr('cancel')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -1036,7 +1027,7 @@ class _HeldOrdersSheetState extends State<_HeldOrdersSheet> {
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
             ),
-            child: const Text('Remove'),
+            child: Text(context.tr('remove')),
           ),
         ],
       ),
@@ -1107,7 +1098,7 @@ class _HeldOrdersSheetState extends State<_HeldOrdersSheet> {
               children: [
                 Expanded(
                   child: Text(
-                    'Held Orders',
+                    context.tr('held_orders'),
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
@@ -1222,7 +1213,7 @@ class _HeldOrderCard extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: isDeleting ? null : onResume,
                   icon: const Icon(Icons.shopping_cart_checkout),
-                  label: const Text('Resume Cart'),
+                  label: Text(context.tr('resume_cart')),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF23C16B),
                     foregroundColor: Colors.white,
@@ -1288,10 +1279,10 @@ class _HeldOrderEmpty extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: _cardDecoration(context),
-      child: const Center(
+      child: Center(
         child: Text(
-          'No held orders found',
-          style: TextStyle(color: Color(0xFF6B7280)),
+          context.tr('no_held_orders'),
+          style: const TextStyle(color: Color(0xFF6B7280)),
         ),
       ),
     );

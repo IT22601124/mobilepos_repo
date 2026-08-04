@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platform_image_3.dart';
 import 'package:image/image.dart' as img;
+import 'package:dio/dio.dart';
 
 class PosPaymentSuccessScreen extends StatefulWidget {
   final String saleNo;
@@ -80,6 +82,22 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
     return double.tryParse(value?.toString() ?? '') ?? 0;
   }
 
+  Future<Uint8List?> _fetchLogoBytes(String url) async {
+    if (url.isEmpty) return null;
+    try {
+      final response = await Dio().get<List<int>>(
+        url,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      if (response.data != null) {
+        return Uint8List.fromList(response.data!);
+      }
+    } catch (e) {
+      debugPrint('Error fetching logo: $e');
+    }
+    return null;
+  }
+
   Future<void> printReceipt(BuildContext context) async {
     final printingProvider = context.read<PrintingProvider>();
     final logoBytes = printingProvider.logoBytes;
@@ -109,13 +127,13 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
           // Drastically reduced for "Extra Small" look
           int targetWidth;
           if (width >= 80) {
-            targetWidth = 140; 
+            targetWidth = 140;
           } else if (width >= 70) {
             targetWidth = 135;
           } else if (width >= 58) {
-            targetWidth = 100; 
+            targetWidth = 100;
           } else {
-            targetWidth = 60; 
+            targetWidth = 60;
           }
 
           final resizedImage = img.copyResize(image, width: targetWidth);
@@ -130,7 +148,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
     // Helper to add text or rows with simulated margins
     void addLine(String text, {PosStyles styles = const PosStyles()}) {
       // Simulate a small margin (approx 0.5 column) using spaces
-      const String leftMargin = "  "; 
+      const String leftMargin = "  ";
       const String rightMargin = "  ";
       if (isTiny) {
         bytes += generator.text(leftMargin + text + rightMargin, styles: styles);
@@ -152,7 +170,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
       // Simulate a small margin (approx 0.5 column) using spaces
       const String leftMargin = "  ";
       const String rightMargin = "  ";
-      
+
       if (isTiny) {
         if (columns.isNotEmpty) {
            // Add left padding to first column
@@ -232,16 +250,16 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
           height: isTiny ? PosTextSize.size1 : PosTextSize.size2,
           width: isTiny ? PosTextSize.size1 : PosTextSize.size2,
         ));
-    addLine('Sales Receipt', styles: const PosStyles(align: PosAlign.center));
+    addLine('${context.tr('sales_receipt')}', styles: const PosStyles(align: PosAlign.center));
     bytes += generator.feed(1);
 
     // Info
-    addLine('Sale: ${widget.saleNo}');
+    addLine('${context.tr('sale_no')}: ${widget.saleNo}');
     if (!isTiny) {
-      addLine('Customer: ${widget.customerName}');
-      addLine('Payment: ${widget.paymentMethod}');
+      addLine('${context.tr('customer')}: ${widget.customerName}');
+      addLine('${context.tr('payment')}: ${widget.paymentMethod}');
     }
-    addLine('Date: ${DateTime.now().toString().substring(0, 16)}');
+    addLine('${context.tr('date')}: ${DateTime.now().toString().substring(0, 16)}');
     bytes += generator.hr();
 
     // Items
@@ -290,19 +308,19 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
       }
     }
 
-    addSummaryRow('Subtotal', widget.subtotal);
-    addSummaryRow('Discount', widget.discount);
-    addSummaryRow('Tax ${widget.taxRate.toStringAsFixed(0)}%', widget.tax);
+    addSummaryRow(context.tr('subtotal'), widget.subtotal);
+    addSummaryRow(context.tr('discount'), widget.discount);
+    addSummaryRow('${context.tr('tax')} ${widget.taxRate.toStringAsFixed(0)}%', widget.tax);
 
     bytes += generator.hr();
 
     if (isTiny) {
-      bytes += generator.text('TOTAL: ${money(widget.total)}',
+      bytes += generator.text('${context.tr('total_caps')}: ${money(widget.total)}',
           styles: const PosStyles(align: PosAlign.right, bold: true));
     } else {
       addRow([
         PosColumn(
-            text: 'TOTAL',
+            text: context.tr('total_caps'),
             width: 7,
             styles: const PosStyles(bold: true, height: PosTextSize.size2)),
         PosColumn(
@@ -314,21 +332,21 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
     }
 
     bytes += generator.feed(1);
-    addLine('Paid: ${money(widget.paid)}',
+    addLine('${context.tr('paid')}: ${money(widget.paid)}',
         styles: const PosStyles(align: PosAlign.right));
 
     if (widget.paymentMethod == 'Cash') {
-      addLine('Change: ${money(widget.change)}',
+      addLine('${context.tr('change')}: ${money(widget.change)}',
           styles: const PosStyles(align: PosAlign.right));
     }
 
     bytes += generator.feed(1);
     if (widget.storeAddress.isNotEmpty) {
-      addLine(widget.storeAddress,
+      bytes += generator.text(widget.storeAddress,
           styles: const PosStyles(align: PosAlign.center));
     }
     if (widget.storePhone.isNotEmpty) {
-      addLine('Phone: ${widget.storePhone}',
+      addLine('${context.tr('phone')}: ${widget.storePhone}',
           styles: const PosStyles(align: PosAlign.center));
     }
 
@@ -359,24 +377,36 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
     final widthMm = provider.paperWidthMm;
     final isTiny = widthMm < 44;
 
+    final String trReceipt = context.tr('sales_receipt');
+    final String trSaleNo = context.tr('sale_no');
+    final String trCustomer = context.tr('customer');
+    final String trDate = context.tr('date');
+    final String trSubtotal = context.tr('subtotal');
+    final String trDiscount = context.tr('discount');
+    final String trTax = context.tr('tax');
+    final String trTotal = context.tr('total');
+    final String trPaid = context.tr('paid');
+    final String trChange = context.tr('change');
+    final String trPhone = context.tr('phone');
+
     PdfPageFormat format;
     if (widthMm == 30) {
-      format = PdfPageFormat(30 * PdfPageFormat.mm, double.infinity, 
-          marginLeft: 2 * PdfPageFormat.mm, marginRight: 2 * PdfPageFormat.mm, 
+      format = PdfPageFormat(30 * PdfPageFormat.mm, double.infinity,
+          marginLeft: 2 * PdfPageFormat.mm, marginRight: 2 * PdfPageFormat.mm,
           marginTop: 2 * PdfPageFormat.mm, marginBottom: 2 * PdfPageFormat.mm);
     } else if (widthMm == 44) {
-      format = PdfPageFormat(44 * PdfPageFormat.mm, double.infinity, 
+      format = PdfPageFormat(44 * PdfPageFormat.mm, double.infinity,
           marginLeft: 4 * PdfPageFormat.mm, marginRight: 4 * PdfPageFormat.mm,
           marginTop: 2 * PdfPageFormat.mm, marginBottom: 2 * PdfPageFormat.mm);
     } else if (widthMm == 57) {
       format = PdfPageFormat.roll57.copyWith(
           marginLeft: 5 * PdfPageFormat.mm, marginRight: 5 * PdfPageFormat.mm);
     } else if (widthMm == 58) {
-      format = PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, 
+      format = PdfPageFormat(58 * PdfPageFormat.mm, double.infinity,
           marginLeft: 6 * PdfPageFormat.mm, marginRight: 6 * PdfPageFormat.mm,
           marginTop: 2 * PdfPageFormat.mm, marginBottom: 2 * PdfPageFormat.mm);
     } else if (widthMm == 70 || widthMm == 72) {
-      format = PdfPageFormat(widthMm * PdfPageFormat.mm, double.infinity, 
+      format = PdfPageFormat(widthMm * PdfPageFormat.mm, double.infinity,
           marginLeft: 5 * PdfPageFormat.mm, marginRight: 5 * PdfPageFormat.mm,
           marginTop: 2 * PdfPageFormat.mm, marginBottom: 2 * PdfPageFormat.mm);
     } else {
@@ -423,7 +453,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
                   ),
                   pw.Center(
                     child: pw.Text(
-                      'Sales Receipt',
+                      trReceipt,
                       style: pw.TextStyle(
                         fontSize: fontSize,
                         fontStyle: pw.FontStyle.italic,
@@ -431,10 +461,10 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
                     ),
                   ),
                   pw.SizedBox(height: 8),
-                  _pdfRow('Sale No', widget.saleNo, fontSize: fontSize),
+                  _pdfRow(trSaleNo, widget.saleNo, fontSize: fontSize),
                   if (!isTiny)
-                    _pdfRow('Customer', widget.customerName, fontSize: fontSize),
-                  _pdfRow('Date', DateTime.now().toString().substring(0, 16),
+                    _pdfRow(trCustomer, widget.customerName, fontSize: fontSize),
+                  _pdfRow(trDate, DateTime.now().toString().substring(0, 16),
                       fontSize: fontSize),
                   pw.Divider(thickness: 0.5),
                   ...widget.cart.map((item) {
@@ -464,20 +494,20 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
                     );
                   }),
                   pw.Divider(thickness: 0.5),
-                  _pdfRow('Subtotal', money(widget.subtotal),
+                  _pdfRow(trSubtotal, money(widget.subtotal),
                       fontSize: fontSize),
-                  _pdfRow('Discount', money(widget.discount),
+                  _pdfRow(trDiscount, money(widget.discount),
                       fontSize: fontSize),
-                  _pdfRow('Tax ${widget.taxRate.toStringAsFixed(0)}%',
+                  _pdfRow('$trTax ${widget.taxRate.toStringAsFixed(0)}%',
                       money(widget.tax),
                       fontSize: fontSize),
                   pw.Divider(thickness: 0.5),
-                  _pdfRow('Total', money(widget.total),
+                  _pdfRow(trTotal, money(widget.total),
                       bold: true,
                       fontSize: isTiny ? fontSize : fontSize + 2),
-                  _pdfRow('Paid', money(widget.paid), fontSize: fontSize),
+                  _pdfRow(trPaid, money(widget.paid), fontSize: fontSize),
                   if (widget.paymentMethod == 'Cash')
-                    _pdfRow('Change', money(widget.change), fontSize: fontSize),
+                    _pdfRow(trChange, money(widget.change), fontSize: fontSize),
                   pw.SizedBox(height: 8),
                   if (widget.storeAddress.isNotEmpty)
                     pw.Center(
@@ -490,7 +520,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
                   if (widget.storePhone.isNotEmpty)
                     pw.Center(
                       child: pw.Text(
-                        'Phone: ${widget.storePhone}',
+                       '$trPhone: ${widget.storePhone}',
                         textAlign: pw.TextAlign.center,
                         style: pw.TextStyle(fontSize: fontSize - 1),
                       ),
@@ -580,7 +610,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
 
             Center(
               child: Text(
-                'Payment Successful',
+                context.tr('payment_success'),
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
@@ -633,7 +663,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
                   child: OutlinedButton.icon(
                     onPressed: sharePdfReceipt,
                     icon: const Icon(Icons.share_rounded),
-                    label: const Text('Share'),
+                    label: Text(context.tr('share')),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -645,7 +675,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
                   child: OutlinedButton.icon(
                     onPressed: () => printReceipt(context),
                     icon: const Icon(Icons.file_download_outlined),
-                    label: const Text('Download'),
+                    label: Text(context.tr('download')),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -679,7 +709,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
             TextButton.icon(
               onPressed: () => context.go('/pos_terminal'),
               icon: const Icon(Icons.point_of_sale),
-              label: const Text('Start New Sale'),
+              label: Text(context.tr('start_new_sale')),
               style: TextButton.styleFrom(
                 foregroundColor: colorScheme.primary,
               ),
@@ -744,7 +774,7 @@ class _ReceiptCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<PrintingProvider>();
     final widthMm = provider.paperWidthMm;
-    
+
     // Scale the card width based on paper size to give a "preview" feel
     double cardWidth;
     if (widthMm <= 44) {
@@ -787,7 +817,7 @@ class _ReceiptCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Sales Receipt',
+                    context.tr('sales_receipt'),
                     style: TextStyle(
                       color: Theme.of(context).hintColor,
                       fontSize: 12,
@@ -797,9 +827,9 @@ class _ReceiptCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            _InfoRow(label: 'Sale No', value: saleNo),
-            _InfoRow(label: 'Customer', value: customerName),
-            _InfoRow(label: 'Payment', value: paymentMethod),
+            _InfoRow(label: context.tr('sale_no'), value: saleNo),
+            _InfoRow(label: context.tr('customer'), value: customerName),
+            _InfoRow(label: context.tr('payment'), value: paymentMethod),
             const Divider(),
 
             ...cart.map((item) {
@@ -817,15 +847,15 @@ class _ReceiptCard extends StatelessWidget {
             }),
 
             const Divider(),
-            _InfoRow(label: 'Subtotal', value: money(subtotal)),
-            _InfoRow(label: 'Discount', value: money(discount)),
-            _InfoRow(label: 'Tax ${taxRate.toStringAsFixed(0)}%', value: money(tax)),
-            _InfoRow(label: 'Total', value: money(total), strong: true),
-            _InfoRow(label: 'Paid', value: money(paid)),
+            _InfoRow(label: context.tr('subtotal'), value: money(subtotal)),
+            _InfoRow(label: context.tr('discount'), value: money(discount)),
+            _InfoRow(label: '${context.tr('tax')} ${taxRate.toStringAsFixed(0)}%', value: money(tax)),
+            _InfoRow(label:context.tr('total'), value: money(total), strong: true),
+            _InfoRow(label: context.tr('paid'), value: money(paid)),
             if (paymentMethod == 'Cash')
-              _InfoRow(label: 'Change', value: money(change)),
+              _InfoRow(label: context.tr('change'), value: money(change)),
             if (paymentMethod == 'Credit')
-              _InfoRow(label: 'Credit', value: money(creditAmount)),
+              _InfoRow(label: context.tr('credit'), value: money(creditAmount)),
             const Divider(),
             if (storeAddress.isNotEmpty)
               Center(
@@ -841,7 +871,7 @@ class _ReceiptCard extends StatelessWidget {
             if (storePhone.isNotEmpty)
               Center(
                 child: Text(
-                  'Phone: $storePhone',
+                  '${context.tr('phone')}: $storePhone',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Theme.of(context).hintColor,

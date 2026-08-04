@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:mpos/provider/printing_provider.dart';
 import 'package:provider/provider.dart';
@@ -31,7 +32,7 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
       if (statuses.values.any((status) => status.isDenied)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Bluetooth and Location permissions are required for printer discovery')),
+            SnackBar(content: Text(context.tr('bluetooth_permission_required'))),
           );
         }
       }
@@ -45,7 +46,7 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Printing Options', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: Text(context.tr('printing_options'), style: const TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -78,7 +79,7 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Paper Size', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+            Text(context.tr('paper_size'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -112,13 +113,13 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Connection Type', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+            Text(context.tr('connection_type'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: ChoiceChip(
-                    label: const Center(child: Text('Bluetooth')),
+                    label: Center(child: Text(context.tr('bluetooth'))),
                     selected: provider.connectionType == PrinterConnectionType.bluetooth,
                     onSelected: (selected) {
                       if (selected) provider.setConnectionType(PrinterConnectionType.bluetooth);
@@ -128,7 +129,7 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ChoiceChip(
-                    label: const Center(child: Text('USB')),
+                    label: Center(child: Text(context.tr('usb'))),
                     selected: provider.connectionType == PrinterConnectionType.usb,
                     onSelected: (selected) {
                       if (selected) provider.setConnectionType(PrinterConnectionType.usb);
@@ -151,9 +152,9 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
         side: BorderSide(color: theme.dividerColor),
       ),
       child: SwitchListTile(
-        title: const Text('Automatic Printing',
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-        subtitle: const Text('Automatically print receipt after payment'),
+        title: Text(context.tr('automatic_printing'),
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+        subtitle: Text(context.tr('auto_print_subtitle')),
         value: provider.autoPrint,
         onChanged: (value) => provider.setAutoPrint(value),
       ),
@@ -179,7 +180,7 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Available Devices', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                Text(context.tr('available_devices'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                 if (provider.isScanning)
                   const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                 else
@@ -195,7 +196,7 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
               padding: const EdgeInsets.all(32),
               child: Center(
                 child: Text(
-                  'No devices found. Tap refresh to scan.',
+                  context.tr('no_devices_found'),
                   style: TextStyle(color: theme.hintColor),
                 ),
               ),
@@ -235,7 +236,7 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
         ElevatedButton.icon(
           onPressed: provider.isConnected ? () => provider.testPrint() : null,
           icon: const Icon(Icons.print),
-          label: const Text('Print Test Page'),
+          label: Text(context.tr('print_test_page')),
           style: ElevatedButton.styleFrom(
             minimumSize: const Size(double.infinity, 50),
             backgroundColor: theme.colorScheme.primary,
@@ -247,7 +248,7 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              'Connect to a printer first to print test page',
+              context.tr('connect_printer_first'),
               style: TextStyle(color: theme.colorScheme.error, fontSize: 12),
             ),
           ),

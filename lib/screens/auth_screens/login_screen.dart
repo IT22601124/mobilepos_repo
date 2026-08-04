@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mpos/utils/custom_snackbar.dart';
@@ -37,10 +38,10 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
           _passwordController.text.trim(),
         );
         if (!success) {
-          throw 'Login failed. Please try again.';
+          throw context.tr('login_failed');
         }
         if (!mounted) return;
-        CustomSnackBar.success(context, 'Login successful');
+        CustomSnackBar.success(context, context.tr('login_success'));
         context.go('/mainNavigation');
       } catch (e) {
         if (!mounted) return;
@@ -95,7 +96,7 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
 
                   Center(
                     child: Text(
-                      'Unlock your mobile checkout drawer',
+                      context.tr('welcome_back'),
                       style: TextStyle(
                         fontSize: 12,
                         color: color.onSurface.withValues(alpha: 0.6),
@@ -119,7 +120,7 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
 
                   // ================= PHONE =================
                   Text(
-                    'MOBILE NUMBER',
+                    context.tr('mobile_number'),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -135,10 +136,10 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                     style: TextStyle(color: color.onSurface),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return 'Mobile number is required';
+                        return context.tr('mobile_number_required');
                       }
                       if (value.trim().length < 9) {
-                        return 'Enter a valid mobile number';
+                        return context.tr('valid_mobile_required');
                       }
                       return null;
                     },
@@ -176,7 +177,7 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
 
                   // ================= PASSWORD =================
                   Text(
-                    'PASSWORD',
+                    context.tr('password').toUpperCase(),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -192,10 +193,10 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                     style: TextStyle(color: color.onSurface),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Password is required';
+                        return context.tr('password_required');
                       }
                       if (value.length < 4) {
-                        return 'Password is too short';
+                        return context.tr('password_too_short');
                       }
                       return null;
                     },
@@ -245,7 +246,7 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                             activeColor: color.primary,
                           ),
                           Text(
-                            'Remember me',
+                            context.tr('remember_me'),
                             style: TextStyle(color: color.onSurface),
                           ),
                         ],
@@ -254,7 +255,7 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                       TextButton(
                         onPressed: () {},
                         child: Text(
-                          'Forgot Password?',
+                          context.tr('forgot_password'),
                           style: TextStyle(color: color.primary),
                         ),
                       ),
@@ -266,7 +267,7 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                   Consumer<AuthProvider>(
                     builder: (context, provider, child) {
                       return MainButton(
-                        text: 'Login',
+                        text: context.tr('login'),
                         onPressed: provider.isLoading ? null : _handleLogin,
                         isLoading: provider.isLoading,
                       );
@@ -274,21 +275,21 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                   ),
 
                   const SizedBox(height: 20),
-                  // Row(
-                  //   mainAxisAlignment: MainAxisAlignment.center,
-                  //   children: [
-                  //     Text(
-                  //       'New merchant? ',
-                  //       style: TextStyle(
-                  //         color: color.onSurface.withValues(alpha: 0.6),
-                  //       ),
-                  //     ),
-                  //     TextButton(
-                  //       onPressed: () => context.go('/register'),
-                  //       child: const Text('Create account'),
-                  //     ),
-                  //   ],
-                  // ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        context.tr('dont_have_account'),
+                        style: TextStyle(
+                          color: color.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => context.go('/register'),
+                        child: Text(context.tr('sign_up')),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

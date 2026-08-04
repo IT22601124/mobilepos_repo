@@ -10,6 +10,8 @@ import 'package:mpos/provider/auth_provider/auth_provider.dart';
 import 'package:mpos/provider/theme_provider/theme_provider.dart';
 import 'package:mpos/screens/overview/dashboard_screen.dart';
 import 'package:mpos/utils/app_back_scope.dart';
+import 'package:mpos/provider/language_provider.dart';
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../pos_management_screen/pos_management_screen.dart';
@@ -161,12 +163,12 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
               const SizedBox(height: 3),
               Text(
                 index == 0
-                    ? 'Dashboard'
+                    ? context.tr('dashboard')
                     : index == 1
-                        ? 'Management'
+                        ? context.tr('management')
                         : index == 2
-                            ? 'Settings'
-                            : 'Profile',
+                            ? context.tr('settings')
+                            : context.tr('profile'),
                 maxLines: 1,
                 style: TextStyle(
                   color: color,
@@ -219,13 +221,15 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
+    final languageProvider = context.watch<LanguageProvider>();
+    final locale = languageProvider.locale;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
-          'Settings',
-          style: TextStyle(fontWeight: FontWeight.w800),
+        title: Text(
+          context.tr('settings'),
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: SafeArea(
@@ -233,35 +237,57 @@ class SettingsScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           children: [
             _AppearanceSettingsCard(themeProvider: themeProvider),
-            const _SettingsTile(
+            _SettingsTile(
+              icon: Icons.language_outlined,
+              title: context.tr('language'),
+              subtitle: locale.languageCode == 'en'
+                  ? context.tr('english')
+                  : context.tr('sinhala'),
+              trailing: DropdownButton<String>(
+                value: locale.languageCode,
+                underline: const SizedBox(),
+                items: [
+                  DropdownMenuItem(
+                      value: 'en', child: Text(context.tr('english'))),
+                  DropdownMenuItem(
+                      value: 'si', child: Text(context.tr('sinhala'))),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    languageProvider.setLanguage(Locale(val));
+                  }
+                },
+              ),
+            ),
+            _SettingsTile(
               icon: Icons.receipt_long,
-              title: 'Receipt footer',
+              title: context.tr('receipt_footer'),
               subtitle: 'Thank you for shopping with NOVA POS',
-              trailing: Icon(Icons.chevron_right),
+              trailing: const Icon(Icons.chevron_right),
             ),
             _SettingsTile(
               icon: Icons.print_outlined,
-              title: 'Printing options',
-              subtitle: 'Paper size, copies and automatic printing',
+              title: context.tr('printing_options'),
+              subtitle: context.tr('printing_subtitle'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/printing-options'),
             ),
-            const _SettingsTile(
+            _SettingsTile(
               icon: Icons.payments_outlined,
-              title: 'Payment methods',
+              title: context.tr('payment_methods'),
               subtitle: 'Cash, card, credit and wallet enabled',
-              trailing: Icon(Icons.chevron_right),
+              trailing: const Icon(Icons.chevron_right),
             ),
-            const _SettingsTile(
+            _SettingsTile(
               icon: Icons.security_outlined,
-              title: 'Security',
-              subtitle: 'Demo mode with local protected session',
-              trailing: Icon(Icons.chevron_right),
+              title: context.tr('security'),
+              subtitle: context.tr('security_subtitle'),
+              trailing: const Icon(Icons.chevron_right),
             ),
             _SettingsTile(
               icon: Icons.storefront,
-              title: 'Store Management',
-              subtitle: 'Profile, receipt identity and logo',
+              title: context.tr('store_management'),
+              subtitle: context.tr('store_subtitle'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/store-management'),
             ),
@@ -283,9 +309,9 @@ class ProfileScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
-          'Profile',
-          style: TextStyle(fontWeight: FontWeight.w800),
+        title: Text(
+          context.tr('profile'),
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: SafeArea(
@@ -323,7 +349,7 @@ class ProfileScreen extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'Merchant administrator',
+                          context.tr('merchant_admin'),
                           style: TextStyle(color: Theme.of(context).hintColor),
                         ),
                       ],
@@ -335,16 +361,16 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 12),
             _SettingsTile(
               icon: Icons.storefront,
-              title: 'Store',
-              subtitle: 'Profile, receipt identity and logo',
+              title: context.tr('store_management'),
+              subtitle: context.tr('store_subtitle'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/store-management'),
             ),
-            const _SettingsTile(
+            _SettingsTile(
               icon: Icons.phone_android,
-              title: 'Terminal',
-              subtitle: 'Mobile POS terminal active',
-              trailing: Icon(Icons.verified, color: Color(0xFF23C16B)),
+              title: context.tr('terminal'),
+              subtitle: context.tr('terminal_subtitle'),
+              trailing: const Icon(Icons.verified, color: Color(0xFF23C16B)),
             ),
             const SizedBox(height: 12),
             ElevatedButton.icon(
@@ -353,7 +379,7 @@ class ProfileScreen extends StatelessWidget {
                 if (context.mounted) context.go('/login');
               },
               icon: const Icon(Icons.logout),
-              label: const Text('Logout'),
+              label: Text(context.tr('logout')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFEF4444),
                 foregroundColor: Colors.white,
@@ -397,13 +423,13 @@ class _AppearanceSettingsCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Appearance',
-                      style: TextStyle(fontWeight: FontWeight.w900),
+                    Text(
+                      context.tr('appearance'),
+                      style: const TextStyle(fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Use system, light, or dark mode',
+                      context.tr('appearance_subtitle'),
                       style: TextStyle(
                         color: Theme.of(context).hintColor,
                         fontSize: 12,
@@ -419,21 +445,21 @@ class _AppearanceSettingsCard extends StatelessWidget {
             width: double.infinity,
             child: SegmentedButton<ThemeMode>(
               showSelectedIcon: false,
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: ThemeMode.system,
-                  icon: Icon(Icons.brightness_auto_outlined, size: 18),
-                  label: Text('System'),
+                  icon: const Icon(Icons.brightness_auto_outlined, size: 18),
+                  label: Text(context.tr('system')),
                 ),
                 ButtonSegment(
                   value: ThemeMode.light,
-                  icon: Icon(Icons.light_mode_outlined, size: 18),
-                  label: Text('Light'),
+                  icon: const Icon(Icons.light_mode_outlined, size: 18),
+                  label: Text(context.tr('light')),
                 ),
                 ButtonSegment(
                   value: ThemeMode.dark,
-                  icon: Icon(Icons.dark_mode_outlined, size: 18),
-                  label: Text('Dark'),
+                  icon: const Icon(Icons.dark_mode_outlined, size: 18),
+                  label: Text(context.tr('dark')),
                 ),
               ],
               selected: {themeProvider.themeMode},

@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mpos/utils/custom_snackbar.dart';
@@ -510,9 +511,9 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
             onPressed: _goBack,
             icon: const Icon(Icons.arrow_back),
           ),
-          title: const Text(
-            'Complete Payment',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+          title: Text(
+            context.tr('complete_payment'),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
           ),
         ),
         body: SafeArea(
@@ -617,8 +618,8 @@ class _PosPaymentScreenState extends State<PosPaymentScreen> {
                 onComplete: completePayment,
                 canComplete: canComplete && !isSubmitting,
                 buttonText: isCredit
-                    ? 'Complete Credit ${money(creditAmount)}'
-                    : 'Complete ${money(widget.total)}',
+                    ? '${context.tr('complete_credit')} ${money(creditAmount)}'
+                    : '${context.tr('complete_payment')} ${money(widget.total)}',
                 isSubmitting: isSubmitting,
               ),
             ],
@@ -646,7 +647,7 @@ class _TotalCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Amount to Pay',
+            context.tr('amount_to_pay'),
             style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.6)),
           ),
           const SizedBox(height: 6),
@@ -690,7 +691,7 @@ class _PaymentMethods extends StatelessWidget {
                     : Theme.of(context).colorScheme.onSurface,
                 padding: const EdgeInsets.symmetric(vertical: 13),
               ),
-              child: Text(method),
+              child: Text(context.tr(method.toLowerCase())),
             ),
           ),
         );
@@ -730,7 +731,7 @@ class _AmountBox extends StatelessWidget {
           TextField(
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
-              labelText: paymentMethod == 'Credit' ? 'Paid now' : 'Amount paid',
+              labelText: paymentMethod == 'Credit' ? context.tr('paid_now') : context.tr('amount_paid'),
               prefixIcon: const Icon(Icons.payments_outlined),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -744,13 +745,13 @@ class _AmountBox extends StatelessWidget {
             },
           ),
           const SizedBox(height: 12),
-          _InfoRow(label: 'Paid', value: money(amountPaid)),
+          _InfoRow(label: context.tr('paid'), value: money(amountPaid)),
           if (paymentMethod == 'Cash')
-            _InfoRow(label: 'Balance', value: money(balanceDue)),
+            _InfoRow(label: context.tr('balance'), value: money(balanceDue)),
           if (paymentMethod == 'Cash')
-            _InfoRow(label: 'Change', value: money(changeDue)),
+            _InfoRow(label: context.tr('change'), value: money(changeDue)),
           if (paymentMethod == 'Credit')
-            _InfoRow(label: 'Credit Amount', value: money(creditAmount)),
+            _InfoRow(label: context.tr('credit_amount'), value: money(creditAmount)),
         ],
       ),
     );
@@ -803,7 +804,7 @@ class _CreditBox extends StatelessWidget {
                   initialValue: selectedCustomer,
                   isExpanded: true,
                   decoration: InputDecoration(
-                    labelText: 'Credit customer',
+                    labelText: context.tr('credit_customer'),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -826,7 +827,7 @@ class _CreditBox extends StatelessWidget {
               IconButton.filledTonal(
                 onPressed: onAddCustomer,
                 icon: const Icon(Icons.person_add_alt_1_outlined),
-                tooltip: 'Quick add customer',
+                tooltip: context.tr('quick_add_customer'),
               ),
             ],
           ),
@@ -837,7 +838,7 @@ class _CreditBox extends StatelessWidget {
                 child: TextField(
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    labelText: 'Due days',
+                    labelText: context.tr('due_days'),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -852,7 +853,7 @@ class _CreditBox extends StatelessWidget {
               TextButton.icon(
                 onPressed: onManageCustomers,
                 icon: const Icon(Icons.settings_outlined, size: 18),
-                label: const Text('Manage'),
+                label: Text(context.tr('manage')),
                 style: TextButton.styleFrom(
                   visualDensity: VisualDensity.compact,
                 ),
@@ -860,8 +861,8 @@ class _CreditBox extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          _InfoRow(label: 'Available credit', value: money(availableCredit)),
-          _InfoRow(label: 'This sale credit', value: money(creditAmount)),
+          _InfoRow(label: context.tr('available_credit'), value: money(availableCredit)),
+          _InfoRow(label: context.tr('this_sale_credit'), value: money(creditAmount)),
         ],
       ),
     );
@@ -895,9 +896,9 @@ class _OrderSummary extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Order Summary',
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+          Text(
+            context.tr('order_summary'),
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
           ),
           const SizedBox(height: 10),
           ...cart.map(
@@ -914,10 +915,10 @@ class _OrderSummary extends StatelessWidget {
             },
           ),
           const Divider(),
-          _InfoRow(label: 'Subtotal', value: money(subtotal)),
-          _InfoRow(label: 'Discount', value: money(discount)),
-          _InfoRow(label: 'Tax ${taxRate.toStringAsFixed(0)}%', value: money(tax)),
-          _InfoRow(label: 'Total', value: money(total), strong: true),
+          _InfoRow(label: context.tr('subtotal'), value: money(subtotal)),
+          _InfoRow(label: context.tr('discount'), value: money(discount)),
+          _InfoRow(label: '${context.tr('tax')} ${taxRate.toStringAsFixed(0)}%', value: money(tax)),
+          _InfoRow(label: context.tr('total'), value: money(total), strong: true),
         ],
       ),
     );
@@ -1051,7 +1052,7 @@ class _Keypad extends StatelessWidget {
                     ),
                   ),
                   onPressed: canComplete ? onComplete : null,
-                  child: const Text('Pay'),
+                  child: Text(context.tr('pay')),
                 ),
               ],
             ),

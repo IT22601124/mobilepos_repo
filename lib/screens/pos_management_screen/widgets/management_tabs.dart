@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 class ManagementTabs extends StatelessWidget {
@@ -43,7 +44,7 @@ class ManagementTabs extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                tab,
+                context.tr(tab.toLowerCase().replaceAll(' ', '_')),
                 style: TextStyle(
                   color: active
                       ? (isDark ? colorScheme.onPrimary : Colors.white)

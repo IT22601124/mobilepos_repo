@@ -1,3 +1,4 @@
+import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 class CartItem extends StatelessWidget {
@@ -37,78 +38,102 @@ class CartItem extends StatelessWidget {
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Expanded(
+      child: Row(
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(8),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item['name'],
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'LKR ${item['price'].toStringAsFixed(0)} each',
-                    style: TextStyle(
-                      color: colorScheme.onSurface.withValues(alpha: 0.6),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? colorScheme.surfaceContainerHighest : theme.scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _QtyBtn(icon: Icons.remove, onTap: onMinus),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(
-                      isWeighted ? item['qty'].toStringAsFixed(3) : '${item['qty'].toInt()}',
-                      style: const TextStyle(fontWeight: FontWeight.w900),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item['name'],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: colorScheme.onSurface,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  _QtyBtn(icon: Icons.add, onTap: onPlus),
-                ],
-              ),
+                    const SizedBox(width: 10),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: SizedBox(
+                        width: 70,
+                        child: Text(
+                          'LKR ${lineTotal.toStringAsFixed(0)}',
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ),
+                    // IconButton(
+                    //   onPressed: onRemove,
+                    //   icon: Icon(Icons.delete_outline, size: 20, color: colorScheme.error),
+                    //   visualDensity: VisualDensity.compact,
+                    // ),
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'LKR ${item['price'].toStringAsFixed(0)} ${context.tr('each')}',
+                      style: TextStyle(
+                        color: colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontSize: 12,
+                      ),
+                    ),
+
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? colorScheme.surfaceContainerHighest : theme.scaffoldBackgroundColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _QtyBtn(icon: Icons.remove, onTap: onMinus),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Text(
+                              isWeighted ? item['qty'].toStringAsFixed(3) : '${item['qty'].toInt()}',
+                              style: const TextStyle(fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                          _QtyBtn(icon: Icons.add, onTap: onPlus),
+                        ],
+                      ),
+                    ),
+                    if (isWeighted)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: Text(unitName, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.primary)),
+                      ),
+                  ],
+                ),
+              ],
             ),
-            if (isWeighted)
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Text(unitName, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.primary)),
-              ),
-            const SizedBox(width: 12),
-            SizedBox(
-              width: 70,
-              child: Text(
-                'LKR ${lineTotal.toStringAsFixed(0)}',
-                textAlign: TextAlign.right,
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-            ),
-            IconButton(
-              onPressed: onRemove,
-              icon: Icon(Icons.delete_outline, size: 20, color: colorScheme.error),
-              visualDensity: VisualDensity.compact,
-            ),
-          ],
+          ),
         ),
-      ),
+          IconButton(
+            onPressed: onRemove,
+            icon: Icon(Icons.delete_outline, size: 20, color: colorScheme.error),
+            visualDensity: VisualDensity.compact,
+          ),
+      ],
+    ),
     );
   }
 }
