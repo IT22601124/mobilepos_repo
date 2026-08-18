@@ -624,28 +624,28 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
                         onRemove: () => updateQty(entry.key, 0),
                       ),
                     ),
-                  const SizedBox(height: 20),
-                  _SectionHeader(
-                    title: 'Products',
-                    subtitle: '${filteredProducts.length} items',
-                  ),
-                  const SizedBox(height: 10),
-                  ...filteredProducts.map(
-                    (product) {
-                      final cartItem = cart.firstWhere(
-                        (item) => item['sku'] == product['sku'],
-                        orElse: () => {},
-                      );
-                      final cartQty = (cartItem['qty'] as num?)?.toDouble() ?? 0.0;
-
-                      return ProductCard(
-                        product: product,
-                        cartQty: cartQty,
-                        onTap: () => addToCart(product),
-                      );
-                    },
-                  ),
-                  if (filteredProducts.isEmpty && !isLoading) const _NoProductsFound(),
+                  // const SizedBox(height: 20),
+                  // _SectionHeader(
+                  //   title: 'Products',
+                  //   subtitle: '${filteredProducts.length} items',
+                  // ),
+                  // const SizedBox(height: 10),
+                  // ...filteredProducts.map(
+                  //   (product) {
+                  //     final cartItem = cart.firstWhere(
+                  //       (item) => item['sku'] == product['sku'],
+                  //       orElse: () => {},
+                  //     );
+                  //     final cartQty = (cartItem['qty'] as num?)?.toDouble() ?? 0.0;
+                  //
+                  //     return ProductCard(
+                  //       product: product,
+                  //       cartQty: cartQty,
+                  //       onTap: () => addToCart(product),
+                  //     );
+                  //   },
+                  // ),
+                  // if (filteredProducts.isEmpty && !isLoading) const _NoProductsFound(),
                   const SizedBox(height: 20),
                 ],
               ),

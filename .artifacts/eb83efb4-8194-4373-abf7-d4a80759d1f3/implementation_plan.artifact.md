@@ -1,42 +1,23 @@
-# Implementation Plan: Responsive Receipt & UI Fixes
+# Implementation Plan: Fix Database Schema Out of Sync
 
-The goal is to optimize the receipt layout for different paper widths (especially 72mm) and fix a UI overflow in the POS Terminal screen.
-
-## User Review Required
-
-> [!IMPORTANT]
-> The thermal printer library `esc_pos_utils_plus` supports specific `PaperSize` enums. I will ensure that the 72mm layout uses the available library capabilities while maximizing the printable area.
+The app is experiencing database errors because the local SQLite schema (`mpos_offline.db`) does not match the current code definition. Specifically, the `products` table is missing the `price` column, and the `sync_queue` table does not exist at all on the user's device.
 
 ## Proposed Changes
 
-### [PosTerminalScreen](file:///F:/mpos/lib/screens/pos_screen/pos_terminal_screen.dart)
+### [DatabaseHelper](file:///F:/mpos/lib/database/database_helper.dart)
 
-- [MODIFY] Fix `AppBar` title overflow by wrapping the `Row` content in `Flexible` or using a more compact layout.
-- [MODIFY] Adjust `_TerminalHeader` to prevent overflow when `pendingCount` or long totals are displayed.
+- [MODIFY] Increment the database version from `1` to `2`.
+- [MODIFY] Implement the `onUpgrade` callback in `openDatabase`.
+- [NEW] In `onUpgrade`, drop all existing tables (`products`, `categories`, `customers`, `sync_queue`, `store_profile`) and call `_onCreate` to recreate them with the correct schema.
 
-### [PosPaymentSuccessScreen](file:///F:/mpos/lib/screens/pos_screen/pos_payment_success_screen.dart)
-
-- [MODIFY] **Thermal Printing Optimization**:
-    - Update `targetWidth` for the logo to scale appropriately for 58mm, 72mm, and 80mm.
-    - Refine column ratios in `generator.row` if needed for narrower papers.
-    - Ensure font sizes for headers and items are adjusted based on paper width.
-- [MODIFY] **PDF Generation**:
-    - Ensure `PdfPageFormat` for 72mm is perfectly calibrated.
-    - Adjust margins and font sizes in the PDF to match the thermal print feel.
-- [MODIFY] **On-Screen Receipt Card**:
-    - Potentially adjust the width of the `_ReceiptCard` to visually represent the selected paper size (e.g. 58mm, 72mm, 80mm) to give the user a preview.
-
-### [PrintingProvider](file:///F:/mpos/lib/provider/printing_provider.dart)
-
-- [MODIFY] (Optional) Ensure `PaperSize.mm72` is correctly mapped and supported if it's a custom addition.
+> [!NOTE]
+> Since this database primarily serves as a local cache for offline capabilities, dropping and recreating tables on upgrade is an acceptable strategy to ensure schema consistency.
 
 ## Verification Plan
 
-### Automated Tests
-- N/A
-
 ### Manual Verification
-1.  **UI Fix**: Open POS Terminal on a small device (or emulator with small width) and verify the `AppBar` no longer overflows.
-2.  **Thermal Print**: Select 72mm in Printing Options, then print a receipt. Verify the logo is appropriately sized and the text is well-aligned.
-3.  **PDF/Share**: Generate a PDF for 72mm and verify it looks professional and "responsive" to the width.
-4.  **On-Screen Preview**: Verify the `_ReceiptCard` on the success screen looks good across different screen sizes.
+1. Restart the app.
+2. Observe the logs to ensure the database version upgrade triggers.
+3. Verify that the "Sync failed" error regarding the `price` column no longer appears.
+4. Verify that the "Unhandled Exception: DatabaseException(no such table: sync_queue ...)" error is resolved.
+5. Perform a test sale and verify it can be added to the `sync_queue` if offline, or processed normally if online.
