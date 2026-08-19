@@ -13,6 +13,8 @@ class PrintingOptionsScreen extends StatefulWidget {
 }
 
 class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
+  PrinterRole _activeRole = PrinterRole.receipt;
+
   @override
   void initState() {
     super.initState();
@@ -22,7 +24,8 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
   }
 
   Future<void> _checkPermissions() async {
-    if (context.read<PrintingProvider>().connectionType == PrinterConnectionType.bluetooth) {
+    final provider = context.read<PrintingProvider>();
+    if (provider.connectionType(_activeRole) == PrinterConnectionType.bluetooth) {
       Map<Permission, PermissionStatus> statuses = await [
         Permission.bluetoothScan,
         Permission.bluetoothConnect,
@@ -44,22 +47,81 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
     final printingProvider = context.watch<PrintingProvider>();
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(context.tr('printing_options'), style: const TextStyle(fontWeight: FontWeight.w800)),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(context.tr('printing_options'), style: const TextStyle(fontWeight: FontWeight.w800)),
+          bottom: TabBar(
+            onTap: (index) {
+              setState(() {
+                _activeRole = index == 0 ? PrinterRole.receipt : PrinterRole.label;
+              });
+            },
+            tabs: const [
+              Tab(text: 'Receipt Printer'),
+              Tab(text: 'Label Printer'),
+            ],
+          ),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _buildRoleHeader(printingProvider, theme),
+            const SizedBox(height: 12),
+            _buildConnectionSection(printingProvider, theme),
+            const SizedBox(height: 12),
+            _buildPaperSizeSection(printingProvider, theme),
+            const SizedBox(height: 12),
+            if (_activeRole == PrinterRole.receipt) ...[
+              _buildAutoPrintSection(printingProvider, theme),
+              const SizedBox(height: 20),
+            ],
+            _buildDeviceListSection(printingProvider, theme),
+            const SizedBox(height: 20),
+            _buildTestingSection(printingProvider, theme),
+          ],
+        ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+    );
+  }
+
+  Widget _buildRoleHeader(PrintingProvider provider, ThemeData theme) {
+    final isConnected = provider.isConnected(_activeRole);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isConnected ? Colors.green.withOpacity(0.1) : theme.colorScheme.error.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isConnected ? Colors.green : theme.colorScheme.error),
+      ),
+      child: Row(
         children: [
-          _buildConnectionSection(printingProvider, theme),
-          const SizedBox(height: 12),
-          _buildPaperSizeSection(printingProvider, theme),
-          const SizedBox(height: 12),
-          _buildAutoPrintSection(printingProvider, theme),
-          const SizedBox(height: 20),
-          _buildDeviceListSection(printingProvider, theme),
-          const SizedBox(height: 20),
-          _buildTestingSection(printingProvider, theme),
+          Icon(
+            isConnected ? Icons.check_circle : Icons.error_outline,
+            color: isConnected ? Colors.green : theme.colorScheme.error,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _activeRole == PrinterRole.receipt ? 'Receipt Printer Setup' : 'Label Printer Setup',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  isConnected ? 'Connected and ready' : 'Not connected',
+                  style: TextStyle(fontSize: 12, color: isConnected ? Colors.green[700] : theme.colorScheme.error),
+                ),
+              ],
+            ),
+          ),
+          if (isConnected)
+            TextButton(
+              onPressed: () => provider.disconnect(_activeRole),
+              child: const Text('Disconnect', style: TextStyle(color: Colors.red)),
+            ),
         ],
       ),
     );
@@ -85,12 +147,12 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
               spacing: 8,
               runSpacing: 8,
               children: sizes.map((width) {
-                final isSelected = provider.paperWidthMm == width;
+                final isSelected = provider.paperWidthMm(_activeRole) == width;
                 return ChoiceChip(
                   label: Text('${width}mm'),
                   selected: isSelected,
                   onSelected: (selected) {
-                    if (selected) provider.setPaperWidth(width);
+                    if (selected) provider.setPaperWidth(_activeRole, width);
                   },
                 );
               }).toList(),
@@ -120,9 +182,9 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
                 Expanded(
                   child: ChoiceChip(
                     label: Center(child: Text(context.tr('bluetooth'))),
-                    selected: provider.connectionType == PrinterConnectionType.bluetooth,
+                    selected: provider.connectionType(_activeRole) == PrinterConnectionType.bluetooth,
                     onSelected: (selected) {
-                      if (selected) provider.setConnectionType(PrinterConnectionType.bluetooth);
+                      if (selected) provider.setConnectionType(_activeRole, PrinterConnectionType.bluetooth);
                     },
                   ),
                 ),
@@ -130,9 +192,9 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
                 Expanded(
                   child: ChoiceChip(
                     label: Center(child: Text(context.tr('usb'))),
-                    selected: provider.connectionType == PrinterConnectionType.usb,
+                    selected: provider.connectionType(_activeRole) == PrinterConnectionType.usb,
                     onSelected: (selected) {
-                      if (selected) provider.setConnectionType(PrinterConnectionType.usb);
+                      if (selected) provider.setConnectionType(_activeRole, PrinterConnectionType.usb);
                     },
                   ),
                 ),
@@ -162,7 +224,7 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
   }
 
   Widget _buildDeviceListSection(PrintingProvider provider, ThemeData theme) {
-    final devices = provider.connectionType == PrinterConnectionType.bluetooth
+    final devices = provider.connectionType(_activeRole) == PrinterConnectionType.bluetooth
         ? provider.bluetoothDevices
         : provider.usbDevices;
 
@@ -186,7 +248,7 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
                 else
                   IconButton(
                     icon: const Icon(Icons.refresh),
-                    onPressed: () => provider.scanDevices(),
+                    onPressed: () => provider.scanDevices(_activeRole),
                   ),
               ],
             ),
@@ -212,16 +274,18 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
                 final String name = (device is BluetoothPrinter ? device.deviceName : (device as UsbPrinter).deviceName) ?? 'Unknown Device';
                 final String address = (device is BluetoothPrinter ? device.address : (device as UsbPrinter).address) ?? '';
                 
-                final isSelected = (device is BluetoothPrinter && provider.selectedBluetoothPrinter?.address == device.address) ||
-                                   (device is UsbPrinter && provider.selectedUsbPrinter?.address == device.address);
+                final selectedDevice = provider.selectedPrinter(_activeRole);
+                final isSelected = selectedDevice != null && 
+                    ((device is BluetoothPrinter && selectedDevice is BluetoothPrinter && selectedDevice.address == device.address) ||
+                     (device is UsbPrinter && selectedDevice is UsbPrinter && selectedDevice.address == device.address));
 
                 return ListTile(
                   title: Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
                   subtitle: Text(address),
-                  trailing: isSelected && provider.isConnected
+                  trailing: isSelected && provider.isConnected(_activeRole)
                       ? const Icon(Icons.check_circle, color: Colors.green)
                       : null,
-                  onTap: () => provider.connect(device),
+                  onTap: () => provider.connect(_activeRole, device),
                 );
               },
             ),
@@ -231,12 +295,13 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
   }
 
   Widget _buildTestingSection(PrintingProvider provider, ThemeData theme) {
+    final isConnected = provider.isConnected(_activeRole);
     return Column(
       children: [
         ElevatedButton.icon(
-          onPressed: provider.isConnected ? () => provider.testPrint() : null,
+          onPressed: isConnected ? () => provider.testPrint(_activeRole) : null,
           icon: const Icon(Icons.print),
-          label: Text(context.tr('print_test_page')),
+          label: Text('Print Test (${_activeRole == PrinterRole.receipt ? 'Receipt' : 'Label'})'),
           style: ElevatedButton.styleFrom(
             minimumSize: const Size(double.infinity, 50),
             backgroundColor: theme.colorScheme.primary,
@@ -244,7 +309,7 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
-        if (!provider.isConnected)
+        if (!isConnected)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(

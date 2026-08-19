@@ -15,9 +15,10 @@ import 'package:mpos/utils/app_back_scope.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:excel/excel.dart' hide Border, TextSpan;
+import 'package:excel/excel.dart' hide TextSpan;
 import 'package:path_provider/path_provider.dart';
 
+import '../../provider/printing_provider.dart';
 import 'widgets/management_header.dart';
 import 'widgets/management_option_card.dart';
 import 'widgets/management_tabs.dart';
@@ -50,6 +51,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
   Map<String, Map<String, dynamic>> _settingsPayloads = {};
   final Map<String, List<_LookupOption>> _lookupCache = {};
   String _stockMovementSearch = '';
+  String _productSearch = '';
   String _reportDateFilter = 'All';
   DateTimeRange? _customDateRange;
 
@@ -85,67 +87,20 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
       _FieldConfig('name', 'Product name', required: true),
       _FieldConfig('product_code', 'Product code', required: true),
       _FieldConfig('barcode', 'Barcode'),
-      _FieldConfig('description', 'Description'),
-      _FieldConfig(
-        'category_id',
-        'Category',
-        keyboardType: TextInputType.number,
-        lookupEndpoint: ApiRoutes.categories,
-      ),
-      _FieldConfig(
-        'brand_id',
-        'Brand',
-        keyboardType: TextInputType.number,
-        lookupEndpoint: ApiRoutes.brands,
-      ),
-      _FieldConfig(
-        'unit_id',
-        'Unit',
-        keyboardType: TextInputType.number,
-        lookupEndpoint: ApiRoutes.units,
-      ),
-      _FieldConfig(
-        'selling_price',
-        'Selling price',
-        keyboardType: TextInputType.number,
-      ),
-      _FieldConfig(
-        'cost_price',
-        'Cost price',
-        keyboardType: TextInputType.number,
-      ),
-      _FieldConfig(
-        'wholesale_price',
-        'Wholesale price',
-        keyboardType: TextInputType.number,
-      ),
-      _FieldConfig(
-        'stock_quantity',
-        'Stock quantity',
-        keyboardType: TextInputType.number,
-      ),
-      _FieldConfig(
-        'minimum_stock',
-        'Minimum stock',
-        keyboardType: TextInputType.number,
-      ),
-      _FieldConfig(
-        'tax_rate',
-        'Tax rate',
-        keyboardType: TextInputType.number,
-      ),
-      _FieldConfig(
-        'discount_rate',
-        'Discount rate',
-        keyboardType: TextInputType.number,
-      ),
-      _FieldConfig('image', 'Image path'),
+      // _FieldConfig('description', 'Description'),
+      _FieldConfig('category_id', 'Category', keyboardType: TextInputType.number, lookupEndpoint: ApiRoutes.categories,),
+      _FieldConfig('brand_id', 'Brand', keyboardType: TextInputType.number, lookupEndpoint: ApiRoutes.brands,),
+      _FieldConfig('unit_id', 'Unit', keyboardType: TextInputType.number, lookupEndpoint: ApiRoutes.units,),
+      _FieldConfig('selling_price', 'Selling price', keyboardType: TextInputType.number,),
+      _FieldConfig('cost_price', 'Cost price', keyboardType: TextInputType.number,),
+      _FieldConfig('wholesale_price', 'Wholesale price', keyboardType: TextInputType.number,),
+      _FieldConfig('stock_quantity', 'Stock quantity', keyboardType: TextInputType.number,),
+      _FieldConfig('minimum_stock', 'Minimum stock', keyboardType: TextInputType.number,),
+      _FieldConfig('tax_rate', 'Tax rate', keyboardType: TextInputType.number,),
+      _FieldConfig('discount_rate', 'Discount rate', keyboardType: TextInputType.number,),
+      // _FieldConfig('image', 'Image path'),
       _FieldConfig('weight', 'Weight', keyboardType: TextInputType.number),
-      _FieldConfig(
-        'is_weighted',
-        'Weighted item',
-        options: [_FieldOption('true', 'Yes'), _FieldOption('false', 'No')],
-      ),
+      _FieldConfig('is_weighted', 'Weighted item', options: [_FieldOption('true', 'Yes'), _FieldOption('false', 'No')],),
       _FieldConfig('status', 'Status', options: _statusOptions),
     ];
 
@@ -1635,23 +1590,222 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).cardColor,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (_) {
         return DraggableScrollableSheet(
-          expand: false, initialChildSize: 0.65, maxChildSize: 0.9, minChildSize: 0.35,
+          expand: false, initialChildSize: 0.8, maxChildSize: 0.95, minChildSize: 0.5,
           builder: (_, controller) {
+            final isProduct = resource.tab == 'Products' || resource.tab == 'Stocks' || record.containsKey('selling_price');
+            final isSale = resource.tab == 'POS sales' || record.containsKey('sale_no');
+            
             return ListView(
-              controller: controller, padding: const EdgeInsets.all(18),
+              controller: controller, padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
               children: [
-                Text(resource.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 14),
-                ...record.entries.map((entry) => _DetailRow(label: _label(entry.key), value: _display(entry.value))),
+                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+                const SizedBox(height: 16),
+                
+                if (isSale) ..._buildSaleDetails(record, resource)
+                else if (isProduct) ..._buildProductDetails(record, resource)
+                else ..._buildGenericDetails(record, resource),
               ],
             );
           },
         );
       },
     );
+  }
+
+  List<Widget> _buildSaleDetails(Map<String, dynamic> record, _ResourceConfig resource) {
+    final saleNo = record['sale_no']?.toString() ?? 'Sale';
+    final total = _toDouble(record['grand_total']);
+    final paid = _toDouble(record['paid_amount']);
+    final balance = _toDouble(record['balance_amount']);
+    final status = record['status']?.toString() ?? 'completed';
+    final items = (record['items'] as List?) ?? [];
+    
+    return [
+      _DetailHeader(
+        title: saleNo,
+        subtitle: _formatDateTime(record['created_at']),
+        status: status,
+        trailing: Icon(Icons.receipt_long_outlined, size: 32, color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
+      ),
+      const SizedBox(height: 24),
+      Row(
+        children: [
+          Expanded(child: _MetricBox(label: 'Total', value: 'LKR ${total.toStringAsFixed(0)}', icon: Icons.account_balance_wallet_outlined, color: Colors.blue)),
+          const SizedBox(width: 12),
+          Expanded(child: _MetricBox(label: 'Paid', value: 'LKR ${paid.toStringAsFixed(0)}', icon: Icons.check_circle_outline, color: Colors.green)),
+        ],
+      ),
+      if (balance > 0) ...[
+        const SizedBox(height: 12),
+        _MetricBox(label: 'Balance Due', value: 'LKR ${balance.toStringAsFixed(0)}', icon: Icons.info_outline, color: Colors.orange),
+      ],
+      const SizedBox(height: 24),
+      
+      _DetailSection(
+        title: 'Order Items',
+        icon: Icons.list_alt_outlined,
+        children: items.map((item) {
+          final prod = item['product'] is Map ? item['product'] : {'name': 'Product #${item['product_id']}'};
+          final name = prod['name']?.toString() ?? 'Unknown Item';
+          final qty = _toDouble(item['qty'] ?? item['quantity']);
+          final price = _toDouble(item['unit_price']);
+          final sub = _toDouble(item['line_total']);
+          
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text('$qty x LKR ${price.toStringAsFixed(0)}', style: TextStyle(color: Colors.grey[600], fontSize: 11)),
+                    ],
+                  ),
+                ),
+                Text('LKR ${sub.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+
+      _DetailSection(
+        title: 'Transaction Info',
+        icon: Icons.info_outline,
+        children: [
+          _DetailRow(label: 'Payment Method', value: _display(record['payment_method'])),
+          _DetailRow(label: 'Cashier', value: _display(record['cashier'])),
+          _DetailRow(label: 'Customer', value: _display(record['customer'])),
+          _DetailRow(label: 'Notes', value: record['notes']?.toString() ?? '-'),
+        ],
+      ),
+    ];
+  }
+
+  List<Widget> _buildProductDetails(Map<String, dynamic> record, _ResourceConfig resource) {
+    final pricingKeys = ['selling_price', 'cost_price', 'wholesale_price', 'tax_rate', 'discount_rate'];
+    final inventoryKeys = ['stock_quantity', 'minimum_stock', 'weight', 'is_weighted', 'unit', 'unit_id'];
+    final generalKeys = ['category', 'category_id', 'brand', 'brand_id', 'barcode', 'product_code', 'sku'];
+    
+    final name = record['name']?.toString() ?? 'Unnamed Product';
+    final sku = (record['product_code'] ?? record['sku'] ?? record['barcode'] ?? '-').toString();
+    final price = _toDouble(record['selling_price'] ?? record['price']);
+    final stock = _toDouble(record['stock_quantity'] ?? record['stock']);
+
+    return [
+      _DetailHeader(
+        title: name,
+        subtitle: 'SKU: $sku',
+        status: record['status'],
+        trailing: IconButton(
+          onPressed: () => _handlePrintLabelAction(
+            name: name,
+            price: price.toString(),
+            barcode: record['barcode']?.toString() ?? '',
+            resource: resource,
+            record: record,
+          ),
+          icon: const Icon(Icons.print_outlined, size: 28),
+          tooltip: 'Print Label',
+        ),
+      ),
+      const SizedBox(height: 24),
+      Row(
+        children: [
+          Expanded(child: _MetricBox(label: 'Price', value: 'LKR ${price.toStringAsFixed(0)}', icon: Icons.payments_outlined, color: Colors.blue)),
+          const SizedBox(width: 12),
+          Expanded(child: _MetricBox(label: 'Inventory', value: '${stock.toInt()} available', icon: Icons.inventory_2_outlined, color: stock <= 0 ? Colors.red : Colors.green)),
+        ],
+      ),
+      const SizedBox(height: 24),
+      _DetailSection(title: 'Pricing & Tax', icon: Icons.sell_outlined, children: pricingKeys.map((k) => record.containsKey(k) ? _DetailRow(label: _label(k), value: _display(record[k])) : const SizedBox()).toList()),
+      _DetailSection(title: 'Stock & Measurement', icon: Icons.straighten_outlined, children: inventoryKeys.map((k) => record.containsKey(k) ? _DetailRow(label: _label(k), value: _display(record[k])) : const SizedBox()).toList()),
+      _DetailSection(title: 'Categorization', icon: Icons.category_outlined, children: generalKeys.map((k) => record.containsKey(k) ? _DetailRow(label: _label(k), value: _display(record[k])) : const SizedBox()).toList()),
+      if (record.containsKey('description') && record['description'] != null)
+         _DetailSection(title: 'Description', icon: Icons.description_outlined, children: [Text(record['description'], style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), height: 1.5))]),
+    ];
+  }
+
+  List<Widget> _buildGenericDetails(Map<String, dynamic> record, _ResourceConfig resource) {
+    // Group fields automatically
+    final contactKeys = ['phone', 'email', 'address', 'website', 'mobile'];
+    final metaKeys = ['created_at', 'updated_at', 'id', '_id', 'created_by', 'updated_by'];
+    final infoKeys = ['name', 'title', 'status', 'role_name', 'description', 'notes', 'remarks'];
+    
+    final children = record.entries.where((e) => !contactKeys.contains(e.key) && !metaKeys.contains(e.key) && !infoKeys.contains(e.key)).map((e) => _DetailRow(label: _label(e.key), value: _display(e.value))).toList();
+    final contacts = record.entries.where((e) => contactKeys.contains(e.key)).map((e) => _DetailRow(label: _label(e.key), value: _display(e.value))).toList();
+    final meta = record.entries.where((e) => metaKeys.contains(e.key)).map((e) => _DetailRow(label: _label(e.key), value: _display(e.value))).toList();
+    final info = record.entries.where((e) => infoKeys.contains(e.key) && e.key != 'name' && e.key != 'status').map((e) => _DetailRow(label: _label(e.key), value: _display(e.value))).toList();
+
+    return [
+      _DetailHeader(title: _titleFor(record), subtitle: resource.tab, status: record['status']),
+      const SizedBox(height: 24),
+      if (info.isNotEmpty) _DetailSection(title: 'Overview', icon: Icons.info_outline, children: info),
+      if (contacts.isNotEmpty) _DetailSection(title: 'Contact Details', icon: Icons.contact_page_outlined, children: contacts),
+      if (children.isNotEmpty) _DetailSection(title: 'Technical Specs', icon: Icons.analytics_outlined, children: children),
+      if (meta.isNotEmpty) _DetailSection(title: 'System Info', icon: Icons.settings_outlined, children: meta),
+    ];
+  }
+
+  Future<void> _handlePrintLabelAction({
+    required String name,
+    required String price,
+    required String barcode,
+    _ResourceConfig? resource,
+    Map<String, dynamic>? record,
+    Function(String)? onBarcodeGenerated,
+  }) async {
+    if (name.isEmpty) {
+      _showSnack('Product name is required to print label', isError: true);
+      return;
+    }
+
+    var code = barcode;
+    if (code.isEmpty) {
+      code = DateTime.now().millisecondsSinceEpoch.toString().padLeft(12, '0').substring(0, 12);
+      if (onBarcodeGenerated != null) {
+        onBarcodeGenerated(code);
+      }
+
+      // If we have a record and resource, and we generated a barcode, save it
+      if (record != null && resource != null) {
+        final id = _recordId(record);
+        if (id != null) {
+          try {
+            await _dio.put('${resource.endpoint}/$id', data: {...record, 'barcode': code});
+            _showSnack('Barcode generated and saved');
+          } catch (e) {
+            debugPrint('Failed to save generated barcode: $e');
+          }
+        }
+      }
+    }
+
+    final printingProvider = context.read<PrintingProvider>();
+    if (!printingProvider.isConnected(PrinterRole.label)) {
+      _showSnack('Label printer not connected', isError: true);
+      return;
+    }
+
+    final receiptSettings = _settingsPayloads['Receipt'] ?? {};
+    final storeName = receiptSettings['store_name']?.toString() ?? 'NOVA POS';
+
+    try {
+      await printingProvider.printBarcodeLabel(
+        name: name,
+        price: 'LKR $price',
+        barcode: code,
+        storeName: storeName,
+      );
+      _showSnack('Label sent to printer');
+    } catch (e) {
+      _showSnack('Print failed: $e', isError: true);
+    }
   }
 
   Future<void> _showForm(_ResourceConfig resource, {Map<String, dynamic>? record}) async {
@@ -1664,6 +1818,16 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     final controllers = {
       for (final field in resource.fields) field.key: TextEditingController(text: _initialFieldText(field, record)),
     };
+
+    void handlePrintLabel() {
+      _handlePrintLabelAction(
+        name: controllers['name']?.text.trim() ?? '',
+        price: controllers['selling_price']?.text.trim() ?? '0',
+        barcode: controllers['barcode']?.text.trim() ?? '',
+        onBarcodeGenerated: (code) => controllers['barcode']?.text = code,
+      );
+    }
+
     showModalBottomSheet(
       context: context, isScrollControlled: true, backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
@@ -1708,7 +1872,15 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
                         if (resource.tab == 'Products') const _FormHintCard(message: 'Choose category, brand and unit by name. The app will send the correct IDs to the backend.'),
                         ...resource.fields.map((field) {
                           final fieldOptions = field.options.map((option) => _LookupOption(value: option.value, label: option.label)).toList();
-                          return _FormInput(fieldKey: field.key, label: field.label, controller: controllers[field.key]!, keyboardType: field.keyboardType, required: field.required, options: lookupOptions[field.key] ?? fieldOptions);
+                          return _FormInput(
+                            fieldKey: field.key,
+                            label: field.label,
+                            controller: controllers[field.key]!,
+                            keyboardType: field.keyboardType,
+                            required: field.required,
+                            options: lookupOptions[field.key] ?? fieldOptions,
+                            onPrint: (resource.tab == 'Products' && field.key == 'barcode') ? handlePrintLabel : null,
+                          );
                         }),
                       ],
                     ),
@@ -1945,6 +2117,19 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     if (resource.kind == _ResourceKind.settings) return _settingsCards();
     if (resource.kind == _ResourceKind.report) return _reportCards();
     if (resource.tab == 'Stock movements') return _stockMovementCards(resource);
+
+    final isProductTab = resource.tab == 'Products' || resource.tab == 'Stocks';
+    final isSalesTab = resource.tab == 'POS sales';
+    
+    final query = _productSearch.trim().toLowerCase();
+    final filtered = query.isEmpty || (!isProductTab && !isSalesTab)
+        ? _records
+        : _records.where((record) {
+            final name = _titleFor(record).toLowerCase();
+            final code = _subtitleFor(record).toLowerCase();
+            return name.contains(query) || code.contains(query);
+          }).toList();
+
     return [
       if (resource.canCreate) ...[
         SizedBox(
@@ -1960,14 +2145,59 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         ),
         const SizedBox(height: 12),
       ],
-      if (!_isLoading && _records.isEmpty) _EmptyCard(title: '${context.tr('no')} ${context.tr(resource.tab.toLowerCase().replaceAll(' ', '_'))} ${context.tr('found')}', subtitle: context.tr('pull_to_refresh_or_add')),
-      ..._records.map((record) => _ResourceActionCard(
-        icon: resource.icon, title: _titleFor(record), subtitle: _subtitleFor(record), trailing: _trailingFor(record),
-        onView: () => _showDetails(resource, record),
-        onEdit: resource.canEdit ? () => _showForm(resource, record: record) : null,
-        onDelete: resource.canDelete ? () => _deleteRecord(resource, record) : null,
-        extraAction: resource.canUpdateStatus ? IconButton(tooltip: 'Update status', onPressed: () => _updateSaleStatus(record), icon: const Icon(Icons.flag_outlined, color: _blue)) : null,
-      )),
+      if (isProductTab || isSalesTab) ...[
+        TextField(
+          onChanged: (v) => setState(() => _productSearch = v),
+          decoration: InputDecoration(
+            hintText: isSalesTab ? 'Search sale number or customer...' : 'Search by name or code...',
+            prefixIcon: const Icon(Icons.search),
+            filled: true,
+            fillColor: Theme.of(context).cardColor,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            contentPadding: const EdgeInsets.symmetric(vertical: 0),
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+      if (!_isLoading && filtered.isEmpty) _EmptyCard(title: '${context.tr('no')} ${context.tr(resource.tab.toLowerCase().replaceAll(' ', '_'))} ${context.tr('found')}', subtitle: context.tr('pull_to_refresh_or_add')),
+      ...filtered.map((record) {
+        if (resource.tab == 'Products') {
+          return _ProductCatalogCard(
+            record: record,
+            onView: () => _showDetails(resource, record),
+            onEdit: resource.canEdit ? () => _showForm(resource, record: record) : null,
+            onDelete: resource.canDelete ? () => _deleteRecord(resource, record) : null,
+            onPrint: () => _handlePrintLabelAction(
+              name: record['name']?.toString() ?? '',
+              price: record['selling_price']?.toString() ?? '0',
+              barcode: record['barcode']?.toString() ?? '',
+              resource: resource,
+              record: record,
+            ),
+          );
+        }
+        if (resource.tab == 'Stocks') {
+          return _StockInventoryCard(
+            record: record,
+            onView: () => _showDetails(resource, record),
+            onEdit: resource.canEdit ? () => _showForm(resource, record: record) : null,
+          );
+        }
+        if (resource.tab == 'POS sales') {
+           return _SaleActionCard(
+             record: record,
+             onView: () => _showDetails(resource, record),
+             onUpdateStatus: resource.canUpdateStatus ? () => _updateSaleStatus(record) : null,
+           );
+        }
+        return _ResourceActionCard(
+          icon: resource.icon, title: _titleFor(record), subtitle: _subtitleFor(record), trailing: _trailingFor(record),
+          onView: () => _showDetails(resource, record),
+          onEdit: resource.canEdit ? () => _showForm(resource, record: record) : null,
+          onDelete: resource.canDelete ? () => _deleteRecord(resource, record) : null,
+          extraAction: resource.canUpdateStatus ? IconButton(tooltip: 'Update status', onPressed: () => _updateSaleStatus(record), icon: const Icon(Icons.flag_outlined, color: _blue)) : null,
+        );
+      }),
     ];
   }
 
@@ -2041,6 +2271,10 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
                     onDownloadPdf: () => _downloadReportPdf(),
                     onDownloadExcel: () => _downloadReportExcel(),
                     dateFilter: _reportDateFilter,
+                    onViewRow: (data) {
+                       final fakeResource = _ResourceConfig(tab: _activeReportLabel, title: _activeReportLabel, subtitle: '', endpoint: '', icon: Icons.table_chart, color: Colors.blue, fields: const [], sample: const []);
+                       _showDetails(fakeResource, Map<String, dynamic>.from(data));
+                    },
                   ),
               ],
             ],
@@ -2269,12 +2503,171 @@ class _ResourceActionCard extends StatelessWidget {
         Row(children: [
           Expanded(child: OutlinedButton.icon(onPressed: onView, icon: const Icon(Icons.visibility_outlined, size: 18), label: const Text('View'), style: _rowButtonStyle(context))),
           const SizedBox(width: 8),
-          Expanded(child: OutlinedButton.icon(onPressed: onEdit, icon: const Icon(Icons.edit_outlined, size: 18), label: const Text('Edit'), style: _rowButtonStyle(context))),
-          const SizedBox(width: 8),
-          Expanded(child: OutlinedButton.icon(onPressed: onDelete, icon: const Icon(Icons.delete_outline, size: 18), label: const Text('Delete'), style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFEF4444), side: BorderSide.none, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)), padding: const EdgeInsets.symmetric(vertical: 11)))),
+          if (onEdit != null) ...[
+            Expanded(child: OutlinedButton.icon(onPressed: onEdit, icon: const Icon(Icons.edit_outlined, size: 18), label: const Text('Edit'), style: _rowButtonStyle(context))),
+            const SizedBox(width: 8),
+          ],
+          if (onDelete != null)
+            Expanded(child: OutlinedButton.icon(onPressed: onDelete, icon: const Icon(Icons.delete_outline, size: 18), label: const Text('Delete'), style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFEF4444), side: BorderSide.none, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)), padding: const EdgeInsets.symmetric(vertical: 11)))),
           if (extraAction != null) extraAction!,
         ]),
       ]),
+    );
+  }
+}
+
+class _ProductCatalogCard extends StatelessWidget {
+  final Map<String, dynamic> record;
+  final VoidCallback onView;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  final VoidCallback? onPrint;
+
+  const _ProductCatalogCard({
+    required this.record,
+    required this.onView,
+    this.onEdit,
+    this.onDelete,
+    this.onPrint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final price = _toDouble(record['selling_price'] ?? record['price'] ?? 0);
+    final stock = _toDouble(record['stock_quantity'] ?? record['stock'] ?? 0);
+    final status = record['status'] == true || record['status'] == 'true' || record['status'] == 1;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: _cardDecoration(context),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                height: 44, width: 44,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.inventory_2_outlined, color: theme.colorScheme.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(record['name']?.toString() ?? 'Unnamed', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${record['product_code'] ?? record['sku'] ?? '-'}  •  ${_display(record['category'])}',
+                      style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('LKR ${price.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.w900, color: theme.colorScheme.primary)),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: status ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(status ? 'ACTIVE' : 'INACTIVE', style: TextStyle(color: status ? Colors.green : Colors.red, fontSize: 9, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const Divider(height: 20),
+          Row(
+            children: [
+              Expanded(child: OutlinedButton.icon(onPressed: onView, icon: const Icon(Icons.visibility_outlined, size: 16), label: const Text('View'), style: _rowButtonStyle(context))),
+              const SizedBox(width: 8),
+              if (onEdit != null) ...[
+                Expanded(child: OutlinedButton.icon(onPressed: onEdit, icon: const Icon(Icons.edit_outlined, size: 16), label: const Text('Edit'), style: _rowButtonStyle(context))),
+                const SizedBox(width: 8),
+              ],
+              if (onPrint != null) ...[
+                IconButton(onPressed: onPrint, icon: const Icon(Icons.print_outlined, size: 20), tooltip: 'Print label'),
+                const SizedBox(width: 4),
+              ],
+              if (onDelete != null)
+                IconButton(onPressed: onDelete, icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red), tooltip: 'Delete'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StockInventoryCard extends StatelessWidget {
+  final Map<String, dynamic> record;
+  final VoidCallback onView;
+  final VoidCallback? onEdit;
+
+  const _StockInventoryCard({required this.record, required this.onView, this.onEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final stock = _toDouble(record['stock_quantity'] ?? record['stock'] ?? 0);
+    final isLow = stock <= _toDouble(record['minimum_stock'] ?? 5);
+    final isOut = stock <= 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: _cardDecoration(context),
+      child: Row(
+        children: [
+          Container(
+            height: 40, width: 40,
+            decoration: BoxDecoration(
+              color: isOut ? Colors.red.withOpacity(0.1) : isLow ? Colors.orange.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              isOut ? Icons.error_outline : isLow ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+              color: isOut ? Colors.red : isLow ? Colors.orange : Colors.green,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(record['name']?.toString() ?? 'Unnamed', style: const TextStyle(fontWeight: FontWeight.w900)),
+                Text(
+                  'Code: ${record['product_code'] ?? record['sku'] ?? '-'}',
+                  style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('${stock.toInt()} in stock', style: const TextStyle(fontWeight: FontWeight.w900)),
+              Text(
+                isOut ? 'Out of stock' : isLow ? 'Low stock' : 'Optimal',
+                style: TextStyle(color: isOut ? Colors.red : isLow ? Colors.orange : Colors.green, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
+          IconButton(onPressed: onView, icon: const Icon(Icons.chevron_right)),
+        ],
+      ),
     );
   }
 }
@@ -2347,6 +2740,7 @@ class _ReportPayloadCard extends StatelessWidget {
   final VoidCallback onDownloadPdf;
   final VoidCallback onDownloadExcel;
   final String dateFilter;
+  final ValueChanged<Map>? onViewRow;
 
   const _ReportPayloadCard({
     required this.title,
@@ -2355,6 +2749,7 @@ class _ReportPayloadCard extends StatelessWidget {
     required this.onDownloadPdf,
     required this.onDownloadExcel,
     required this.dateFilter,
+    this.onViewRow,
   });
 
   @override
@@ -2415,6 +2810,7 @@ class _ReportPayloadCard extends StatelessWidget {
           ...entries.map((entry) => _ReportSection(
                 label: _sectionLabel(entry.key),
                 value: entry.value,
+                onViewRow: onViewRow,
               )),
         ],
       ),
@@ -2431,7 +2827,8 @@ class _ReportPayloadCard extends StatelessWidget {
 }
 
 class _ReportSection extends StatelessWidget {
-  final String label; final dynamic value; const _ReportSection({required this.label, required this.value});
+  final String label; final dynamic value; final ValueChanged<Map>? onViewRow;
+  const _ReportSection({required this.label, required this.value, this.onViewRow});
   @override Widget build(BuildContext context) {
     final theme = Theme.of(context); final isDark = theme.brightness == Brightness.dark;
     if (value is List) {
@@ -2440,7 +2837,16 @@ class _ReportSection extends StatelessWidget {
       final keys = rows.first.keys.toList();
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(_prettyLabel(label).toUpperCase(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: theme.colorScheme.primary))),
-        ClipRRect(borderRadius: BorderRadius.circular(8), child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: DataTable(headingRowColor: WidgetStateProperty.all(isDark ? theme.colorScheme.surfaceContainerHighest : const Color(0xFF102516)), headingTextStyle: TextStyle(color: isDark ? theme.colorScheme.onSurface : Colors.white, fontSize: 11, fontWeight: FontWeight.w900), columns: keys.map<DataColumn>((k) => DataColumn(label: Text(_prettyLabel(k.toString()).toUpperCase()))).toList(), rows: rows.map<DataRow>((row) => DataRow(cells: keys.map<DataCell>((k) => DataCell(Text(_simpleDisplay(row[k])))).toList())).toList()))),
+        ClipRRect(borderRadius: BorderRadius.circular(8), child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: DataTable(
+          showCheckboxColumn: false,
+          headingRowColor: WidgetStateProperty.all(isDark ? theme.colorScheme.surfaceContainerHighest : const Color(0xFF102516)), 
+          headingTextStyle: TextStyle(color: isDark ? theme.colorScheme.onSurface : Colors.white, fontSize: 11, fontWeight: FontWeight.w900), 
+          columns: keys.map<DataColumn>((k) => DataColumn(label: Text(_prettyLabel(k.toString()).toUpperCase()))).toList(), 
+          rows: rows.map<DataRow>((row) => DataRow(
+            onSelectChanged: onViewRow != null ? (_) => onViewRow!(row) : null,
+            cells: keys.map<DataCell>((k) => DataCell(Text(_simpleDisplay(row[k])))).toList(),
+          )).toList(),
+        ))),
         const SizedBox(height: 20),
       ]);
     }
@@ -2504,21 +2910,240 @@ class _SettingsTile extends StatelessWidget {
   }
 }
 
+class _SaleActionCard extends StatelessWidget {
+  final Map<String, dynamic> record;
+  final VoidCallback onView;
+  final VoidCallback? onUpdateStatus;
+
+  const _SaleActionCard({required this.record, required this.onView, this.onUpdateStatus});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final total = _toDouble(record['grand_total']);
+    final status = record['status']?.toString() ?? 'completed';
+    final date = _formatDateTime(record['created_at']);
+    final customer = _display(record['customer']);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: _cardDecoration(context),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                height: 44, width: 44,
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.receipt_long_outlined, color: Colors.blue),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(record['sale_no']?.toString() ?? 'Sale', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                    Text('$date  •  $customer', style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6), fontSize: 11)),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('LKR ${total.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.green)),
+                  const SizedBox(height: 4),
+                  _statusBadge(status),
+                ],
+              ),
+            ],
+          ),
+          const Divider(height: 20),
+          Row(
+            children: [
+              Expanded(child: OutlinedButton.icon(onPressed: onView, icon: const Icon(Icons.visibility_outlined, size: 16), label: const Text('Details'), style: _rowButtonStyle(context))),
+              if (onUpdateStatus != null) ...[
+                const SizedBox(width: 8),
+                Expanded(child: OutlinedButton.icon(onPressed: onUpdateStatus, icon: const Icon(Icons.flag_outlined, size: 16), label: const Text('Status'), style: _rowButtonStyle(context))),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusBadge(String status) {
+    final color = status == 'cancelled' ? Colors.red : status == 'held' ? Colors.orange : Colors.green;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+      child: Text(status.toUpperCase(), style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold)),
+    );
+  }
+}
+
 class _DetailRow extends StatelessWidget {
   final String label; final String value; const _DetailRow({required this.label, required this.value});
-  @override Widget build(BuildContext context) { return Padding(padding: const EdgeInsets.only(bottom: 9), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [ Expanded(child: Text(label, style: const TextStyle(color: Color(0xFF6B7280)))), const SizedBox(width: 12), Expanded(child: Text(value, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w900))) ])); }
+  @override Widget build(BuildContext context) { 
+    if (value == '-' || value == 'null') return const SizedBox.shrink();
+    return Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [ Expanded(child: Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5), fontSize: 13, fontWeight: FontWeight.w500))), const SizedBox(width: 12), Expanded(child: Text(value, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))) ])); 
+  }
+}
+
+class _DetailHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final dynamic status;
+  final Widget? trailing;
+
+  const _DetailHeader({required this.title, required this.subtitle, this.status, this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = status == true || status == 'true' || status == 1 || status == 'Active';
+    final hasStatus = status != null;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontWeight: FontWeight.w600, fontSize: 13)),
+                  if (hasStatus) ...[
+                    const SizedBox(width: 8),
+                    Container(width: 4, height: 4, decoration: BoxDecoration(shape: BoxShape.circle, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3))),
+                    const SizedBox(width: 8),
+                    Text(isActive ? 'Active' : 'Inactive', style: TextStyle(color: isActive ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 12)),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) trailing!,
+      ],
+    );
+  }
+}
+
+class _DetailSection extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+
+  const _DetailSection({required this.title, required this.icon, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredChildren = children.where((child) => child is! SizedBox).toList();
+    if (filteredChildren.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(title.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Theme.of(context).colorScheme.primary, letterSpacing: 1.0)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding:  EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(12),
+            border: material.Border.all(color: Theme.of(context).dividerColor.withOpacity(0.1)),
+          ),
+          child: Column(children: filteredChildren),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+}
+
+class _MetricBox extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _MetricBox({required this.label, required this.value, required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: material.Border.all(color: color.withOpacity(0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: color),
+          const SizedBox(height: 12),
+          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color.withOpacity(0.8))),
+        ],
+      ),
+    );
+  }
 }
 
 class _FormInput extends StatelessWidget {
   final String fieldKey; final String label; final TextEditingController controller; final TextInputType keyboardType; final bool required; final List<_LookupOption> options;
-  const _FormInput({required this.fieldKey, required this.label, required this.controller, required this.keyboardType, required this.required, required this.options});
+  final VoidCallback? onPrint;
+
+  const _FormInput({required this.fieldKey, required this.label, required this.controller, required this.keyboardType, required this.required, required this.options, this.onPrint});
   @override Widget build(BuildContext context) {
     final menuOptions = options.isNotEmpty ? options : const <_LookupOption>[];
     if (menuOptions.isNotEmpty) {
       final selected = menuOptions.any((option) => option.value == controller.text) ? controller.text : null;
       return Padding(padding: const EdgeInsets.only(bottom: 10), child: DropdownButtonFormField<String>(initialValue: selected, isExpanded: true, decoration: InputDecoration(labelText: required ? '$label *' : label, border: OutlineInputBorder(borderRadius: BorderRadius.circular(6))), items: menuOptions.map((option) => DropdownMenuItem<String>(value: option.value, child: Text(option.label, overflow: TextOverflow.ellipsis))).toList(), onChanged: (value) { controller.text = value ?? ''; }));
     }
-    return Padding(padding:  EdgeInsets.only(bottom: 10), child: TextField(controller: controller, keyboardType: keyboardType, decoration: InputDecoration(labelText: required ? '$label *' : label, border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)), suffixIcon: fieldKey == 'barcode' ? IconButton(icon: const Icon(Icons.qr_code_scanner), onPressed: () async { final result = await Navigator.push<String>(context, MaterialPageRoute(builder: (_) =>  BarcodeScannerView())); if (result != null) controller.text = result; }) : null)));
+    return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            decoration: InputDecoration(
+                labelText: required ? '$label *' : label,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (onPrint != null)
+                      IconButton(
+                          icon: const Icon(Icons.print_outlined),
+                          onPressed: onPrint,
+                          tooltip: 'Print barcode label'),
+                    if (fieldKey == 'barcode')
+                      IconButton(
+                          icon: const Icon(Icons.qr_code_scanner),
+                          onPressed: () async {
+                            final result = await Navigator.push<String>(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const BarcodeScannerView()));
+                            if (result != null) controller.text = result;
+                          }),
+                  ],
+                ))));
   }
 }
 
@@ -2547,6 +3172,11 @@ String _display(dynamic value) {
 
 String _movementType(Map<String, dynamic> record) {
   return _display(_firstValue(record, ['type', 'movement_type', 'method'])).toLowerCase();
+}
+
+double _toDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '') ?? 0;
 }
 
 double _quantity(Map<String, dynamic> record) {

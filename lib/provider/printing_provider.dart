@@ -6,6 +6,7 @@ import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:dio/dio.dart';
 
 enum PrinterConnectionType { bluetooth, usb }
+enum PrinterRole { receipt, label }
 
 class PrintingProvider with ChangeNotifier {
   final printerManager = PrinterManager.instance;
@@ -13,14 +14,18 @@ class PrintingProvider with ChangeNotifier {
   final List<UsbPrinter> _usbDevices = [];
   
   bool _isScanning = false;
-  bool _isConnected = false;
   
-  BluetoothPrinter? _selectedBluetoothPrinter;
-  UsbPrinter? _selectedUsbPrinter;
-  PrinterConnectionType _connectionType = PrinterConnectionType.bluetooth;
-  
-  // Custom Paper Width in mm
-  int _paperWidthMm = 80;
+  // Connection state for Receipt Printer
+  bool _isReceiptConnected = false;
+  dynamic _selectedReceiptPrinter; // Can be BluetoothPrinter or UsbPrinter
+  PrinterConnectionType _receiptConnectionType = PrinterConnectionType.bluetooth;
+  int _receiptPaperWidthMm = 80;
+
+  // Connection state for Label Printer
+  bool _isLabelConnected = false;
+  dynamic _selectedLabelPrinter; // Can be BluetoothPrinter or UsbPrinter
+  PrinterConnectionType _labelConnectionType = PrinterConnectionType.bluetooth;
+  int _labelPaperWidthMm = 58; // Labels are often smaller, defaulting to 58
   
   bool _autoPrint = false;
 
@@ -30,21 +35,21 @@ class PrintingProvider with ChangeNotifier {
   List<BluetoothPrinter> get bluetoothDevices => _bluetoothDevices;
   List<UsbPrinter> get usbDevices => _usbDevices;
   bool get isScanning => _isScanning;
-  bool get isConnected => _isConnected;
-  PrinterConnectionType get connectionType => _connectionType;
-  
-  // Expose both raw width and the PaperSize object for the generator
-  int get paperWidthMm => _paperWidthMm;
-  PaperSize get paperSize {
-    if (_paperWidthMm <= 58) return PaperSize.mm58;
-    if (_paperWidthMm <= 72) return PaperSize.mm72;
-    return PaperSize.mm80;
-  }
   
   bool get autoPrint => _autoPrint;
-  
-  BluetoothPrinter? get selectedBluetoothPrinter => _selectedBluetoothPrinter;
-  UsbPrinter? get selectedUsbPrinter => _selectedUsbPrinter;
+
+  // Getters for specific roles
+  bool isConnected(PrinterRole role) => role == PrinterRole.receipt ? _isReceiptConnected : _isLabelConnected;
+  dynamic selectedPrinter(PrinterRole role) => role == PrinterRole.receipt ? _selectedReceiptPrinter : _selectedLabelPrinter;
+  PrinterConnectionType connectionType(PrinterRole role) => role == PrinterRole.receipt ? _receiptConnectionType : _labelConnectionType;
+  int paperWidthMm(PrinterRole role) => role == PrinterRole.receipt ? _receiptPaperWidthMm : _labelPaperWidthMm;
+
+  PaperSize paperSize(PrinterRole role) {
+    int width = paperWidthMm(role);
+    if (width <= 58) return PaperSize.mm58;
+    if (width <= 72) return PaperSize.mm72;
+    return PaperSize.mm80;
+  }
 
   PrintingProvider() {
     _loadSettings();
@@ -52,11 +57,15 @@ class PrintingProvider with ChangeNotifier {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    final typeIndex = prefs.getInt('printer_type') ?? 0;
-    _connectionType = PrinterConnectionType.values[typeIndex];
     
-    _paperWidthMm = prefs.getInt('paper_width_mm') ?? 80;
+    // Load Receipt Printer settings
+    _receiptConnectionType = PrinterConnectionType.values[prefs.getInt('receipt_printer_type') ?? 0];
+    _receiptPaperWidthMm = prefs.getInt('receipt_paper_width_mm') ?? 80;
     
+    // Load Label Printer settings
+    _labelConnectionType = PrinterConnectionType.values[prefs.getInt('label_printer_type') ?? 0];
+    _labelPaperWidthMm = prefs.getInt('label_paper_width_mm') ?? 58;
+
     _autoPrint = prefs.getBool('auto_print') ?? false;
     
     notifyListeners();
@@ -70,20 +79,42 @@ class PrintingProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void setPaperWidth(int widthMm) {
-    _paperWidthMm = widthMm;
+  void setPaperWidth(PrinterRole role, int widthMm) {
+    if (role == PrinterRole.receipt) {
+      _receiptPaperWidthMm = widthMm;
+    } else {
+      _labelPaperWidthMm = widthMm;
+    }
+    
     SharedPreferences.getInstance().then((prefs) {
-      prefs.setInt('paper_width_mm', widthMm);
+      final key = role == PrinterRole.receipt ? 'receipt_paper_width_mm' : 'label_paper_width_mm';
+      prefs.setInt(key, widthMm);
     });
+    notifyListeners();
+  }
+
+  void setConnectionType(PrinterRole role, PrinterConnectionType type) {
+    if (role == PrinterRole.receipt) {
+      _receiptConnectionType = type;
+      _selectedReceiptPrinter = null;
+      _isReceiptConnected = false;
+    } else {
+      _labelConnectionType = type;
+      _selectedLabelPrinter = null;
+      _isLabelConnected = false;
+    }
+    
+    SharedPreferences.getInstance().then((prefs) {
+      final key = role == PrinterRole.receipt ? 'receipt_printer_type' : 'label_printer_type';
+      prefs.setInt(key, type.index);
+    });
+    
     notifyListeners();
   }
 
   Future<void> fetchAndCacheLogo(String? url) async {
     if (url == null || url.isEmpty) return;
-    
-    // Don't re-fetch if we already have it
     if (_logoBytes != null) return;
-
     try {
       final response = await Dio().get<List<int>>(
         url,
@@ -91,7 +122,6 @@ class PrintingProvider with ChangeNotifier {
       );
       if (response.data != null) {
         _logoBytes = Uint8List.fromList(response.data!);
-        debugPrint('Logo fetched and cached successfully: $url');
         notifyListeners();
       }
     } catch (e) {
@@ -99,34 +129,15 @@ class PrintingProvider with ChangeNotifier {
     }
   }
 
-  // Deprecated - kept for compatibility if needed elsewhere
-  void setPaperSize(PaperSize size) {
-    if (size == PaperSize.mm58) setPaperWidth(58);
-    if (size == PaperSize.mm72) setPaperWidth(72);
-    if (size == PaperSize.mm80) setPaperWidth(80);
-  }
-
-  void setConnectionType(PrinterConnectionType type) {
-    _connectionType = type;
-    _selectedBluetoothPrinter = null;
-    _selectedUsbPrinter = null;
-    _isConnected = false;
-    
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setInt('printer_type', type.index);
-    });
-    
-    notifyListeners();
-  }
-
-  Future<void> scanDevices() async {
+  Future<void> scanDevices(PrinterRole role) async {
     _isScanning = true;
     _bluetoothDevices.clear();
     _usbDevices.clear();
     notifyListeners();
 
     try {
-      if (_connectionType == PrinterConnectionType.bluetooth) {
+      final type = connectionType(role);
+      if (type == PrinterConnectionType.bluetooth) {
         printerManager.discovery(type: PrinterType.bluetooth).listen((device) {
           if (!_bluetoothDevices.any((d) => d.address == device.address)) {
             _bluetoothDevices.add(BluetoothPrinter(
@@ -154,17 +165,16 @@ class PrintingProvider with ChangeNotifier {
       debugPrint("Scan error: $e");
     }
 
-    // Stop scanning after 10 seconds
     Future.delayed(const Duration(seconds: 10), () {
       _isScanning = false;
       notifyListeners();
     });
   }
 
-  Future<bool> connect(dynamic device) async {
+  Future<bool> connect(PrinterRole role, dynamic device) async {
     try {
+      final type = connectionType(role);
       if (device is BluetoothPrinter) {
-        _selectedBluetoothPrinter = device;
         final model = BluetoothPrinterInput(
           name: device.deviceName ?? '',
           address: device.address ?? '',
@@ -172,7 +182,6 @@ class PrintingProvider with ChangeNotifier {
         );
         await printerManager.connect(type: PrinterType.bluetooth, model: model);
       } else if (device is UsbPrinter) {
-        _selectedUsbPrinter = device;
         final model = UsbPrinterInput(
           name: device.deviceName ?? '',
           vendorId: device.vendorId,
@@ -181,50 +190,125 @@ class PrintingProvider with ChangeNotifier {
         await printerManager.connect(type: PrinterType.usb, model: model);
       }
       
-      _isConnected = true;
+      if (role == PrinterRole.receipt) {
+        _selectedReceiptPrinter = device;
+        _isReceiptConnected = true;
+      } else {
+        _selectedLabelPrinter = device;
+        _isLabelConnected = true;
+      }
+      
       notifyListeners();
       return true;
     } catch (e) {
-      _isConnected = false;
+      if (role == PrinterRole.receipt) {
+        _isReceiptConnected = false;
+      } else {
+        _isLabelConnected = false;
+      }
       notifyListeners();
       return false;
     }
   }
 
-  Future<void> disconnect() async {
-    final type = _connectionType == PrinterConnectionType.bluetooth 
+  Future<void> disconnect(PrinterRole role) async {
+    final type = connectionType(role) == PrinterConnectionType.bluetooth 
         ? PrinterType.bluetooth 
         : PrinterType.usb;
     await printerManager.disconnect(type: type);
-    _isConnected = false;
+    
+    if (role == PrinterRole.receipt) {
+      _isReceiptConnected = false;
+    } else {
+      _isLabelConnected = false;
+    }
     notifyListeners();
   }
 
-  Future<void> testPrint() async {
-    if (!_isConnected) return;
+  Future<void> testPrint(PrinterRole role) async {
+    if (!isConnected(role)) return;
 
     final profile = await CapabilityProfile.load();
-    final generator = Generator(paperSize, profile);
+    final generator = Generator(paperSize(role), profile);
     List<int> bytes = [];
 
-    bytes += generator.text('NOVA POS TEST PRINT',
-        styles:  PosStyles(
+    bytes += generator.text('NOVA POS TEST PRINT (${role.name.toUpperCase()})',
+        styles: PosStyles(
           align: PosAlign.center, 
           bold: true, 
-          height: _paperWidthMm < 44 ? PosTextSize.size1 : PosTextSize.size2, 
-          width: _paperWidthMm < 44 ? PosTextSize.size1 : PosTextSize.size2
+          height: paperWidthMm(role) < 44 ? PosTextSize.size1 : PosTextSize.size2, 
+          width: paperWidthMm(role) < 44 ? PosTextSize.size1 : PosTextSize.size2
         ));
     bytes += generator.feed(1);
-    bytes += generator.text('Width: ${_paperWidthMm}mm', styles: const PosStyles(align: PosAlign.center));
-    bytes += generator.text('Connection: ${_connectionType.name.toUpperCase()}', styles: const PosStyles(align: PosAlign.center));
+    bytes += generator.text('Width: ${paperWidthMm(role)}mm', styles: const PosStyles(align: PosAlign.center));
+    bytes += generator.text('Connection: ${connectionType(role).name.toUpperCase()}', styles: const PosStyles(align: PosAlign.center));
     bytes += generator.text('Date: ${DateTime.now().toString().substring(0, 19)}', styles: const PosStyles(align: PosAlign.center));
     bytes += generator.feed(2);
     bytes += generator.cut();
 
-    final type = _connectionType == PrinterConnectionType.bluetooth 
+    final type = connectionType(role) == PrinterConnectionType.bluetooth 
         ? PrinterType.bluetooth 
         : PrinterType.usb;
         
+    await printerManager.send(type: type, bytes: bytes);
+  }
+
+  Future<void> printBarcodeLabel({
+    required String name,
+    required String price,
+    required String barcode,
+    String? storeName,
+  }) async {
+    const role = PrinterRole.label;
+    if (!isConnected(role)) {
+      debugPrint('Label printer not connected');
+      return;
+    }
+
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(paperSize(role), profile);
+    List<int> bytes = [];
+
+    if (storeName != null && storeName.isNotEmpty) {
+      bytes += generator.text(storeName,
+          styles: const PosStyles(align: PosAlign.center, bold: true));
+    }
+
+    bytes += generator.text(name,
+        styles: const PosStyles(
+            align: PosAlign.center, height: PosTextSize.size1, width: PosTextSize.size1));
+
+    bytes += generator.text('Price: $price',
+        styles: const PosStyles(align: PosAlign.center, bold: true));
+
+    bytes += generator.feed(1);
+
+    try {
+      bytes += generator.barcode(Barcode.code128(("{B$barcode").split("")), width: 2, height: 50);
+    } catch (e) {
+      debugPrint('Error generating barcode: $e');
+      bytes += generator.text(barcode, styles: const PosStyles(align: PosAlign.center));
+    }
+
+    bytes += generator.feed(2);
+    bytes += generator.cut();
+
+    final type = connectionType(role) == PrinterConnectionType.bluetooth
+        ? PrinterType.bluetooth
+        : PrinterType.usb;
+
+    await printerManager.send(type: type, bytes: bytes);
+  }
+
+  // Centalized method to send receipt bytes
+  Future<void> sendReceiptBytes(List<int> bytes) async {
+    const role = PrinterRole.receipt;
+    if (!isConnected(role)) return;
+    
+    final type = connectionType(role) == PrinterConnectionType.bluetooth
+        ? PrinterType.bluetooth
+        : PrinterType.usb;
+
     await printerManager.send(type: type, bytes: bytes);
   }
 }

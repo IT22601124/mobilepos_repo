@@ -70,7 +70,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
 
   void _handleAutoPrint() {
     final printingProvider = context.read<PrintingProvider>();
-    if (printingProvider.autoPrint && printingProvider.isConnected) {
+    if (printingProvider.autoPrint && printingProvider.isConnected(PrinterRole.receipt)) {
       printReceipt(context);
     }
   }
@@ -102,7 +102,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
     final printingProvider = context.read<PrintingProvider>();
     final logoBytes = printingProvider.logoBytes;
 
-    if (printingProvider.isConnected) {
+    if (printingProvider.isConnected(PrinterRole.receipt)) {
       await _printToThermalPrinter(printingProvider, logoBytes);
     } else {
       await Printing.layoutPdf(
@@ -113,8 +113,8 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
 
   Future<void> _printToThermalPrinter(PrintingProvider provider, Uint8List? logoBytes) async {
     final profile = await CapabilityProfile.load();
-    final generator = Generator(provider.paperSize, profile);
-    final width = provider.paperWidthMm;
+    final generator = Generator(provider.paperSize(PrinterRole.receipt), profile);
+    final width = provider.paperWidthMm(PrinterRole.receipt);
     final isTiny = width < 44;
     
     List<int> bytes = [];
@@ -356,11 +356,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
     bytes += generator.feed(3);
     bytes += generator.cut();
 
-    final type = provider.connectionType == PrinterConnectionType.bluetooth
-        ? PrinterType.bluetooth
-        : PrinterType.usb;
-
-    await provider.printerManager.send(type: type, bytes: bytes);
+    await provider.sendReceiptBytes(bytes);
   }
 
   Future<void> sharePdfReceipt() async {
@@ -374,7 +370,7 @@ class _PosPaymentSuccessScreenState extends State<PosPaymentSuccessScreen> {
   pw.Document _buildReceiptPdf(Uint8List? logoBytes) {
     final pdf = pw.Document();
     final provider = context.read<PrintingProvider>();
-    final widthMm = provider.paperWidthMm;
+    final widthMm = provider.paperWidthMm(PrinterRole.receipt);
     final isTiny = widthMm < 44;
 
     final String trReceipt = context.tr('sales_receipt');
@@ -773,7 +769,7 @@ class _ReceiptCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PrintingProvider>();
-    final widthMm = provider.paperWidthMm;
+    final widthMm = provider.paperWidthMm(PrinterRole.receipt);
 
     // Scale the card width based on paper size to give a "preview" feel
     double cardWidth;
