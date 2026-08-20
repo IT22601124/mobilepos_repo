@@ -59,12 +59,14 @@ class _WeightInputDialogState extends State<WeightInputDialog> {
   void _submit() {
     final double? weight = double.tryParse(_value);
     if (weight != null && weight > 0) {
+      /* Removing stock check to allow negative stock sales
       if (weight > widget.stockAvailable) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${context.tr('insufficient_stock')}: ${widget.stockAvailable} ${widget.unitName}')),
         );
         return;
       }
+      */
       Navigator.pop(context, weight);
     }
   }

@@ -104,17 +104,17 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 8),
-                  Center(
-                    child: Text(
-                      'Demo: 0777123456 / 123456',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: color.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
+                   const SizedBox(height: 8),
+                  // Center(
+                  //   child: Text(
+                  //     'Demo: 0777123456 / 123456',
+                  //     style: TextStyle(
+                  //       fontSize: 12,
+                  //       color: color.primary,
+                  //       fontWeight: FontWeight.w700,
+                  //     ),
+                  //   ),
+                  // ),
 
                   const SizedBox(height: 36),
 
@@ -233,36 +233,36 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                   const SizedBox(height: 14),
 
                   // ================= REMEMBER + FORGOT =================
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: _rememberMe,
-                            onChanged: (v) {
-                              setState(() => _rememberMe = v ?? false);
-                            },
-                            activeColor: color.primary,
-                          ),
-                          Text(
-                            context.tr('remember_me'),
-                            style: TextStyle(color: color.onSurface),
-                          ),
-                        ],
-                      ),
+                  // Row(
+                  //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  //   children: [
+                  //     Row(
+                  //       children: [
+                  //         Checkbox(
+                  //           value: _rememberMe,
+                  //           onChanged: (v) {
+                  //             setState(() => _rememberMe = v ?? false);
+                  //           },
+                  //           activeColor: color.primary,
+                  //         ),
+                  //         Text(
+                  //           context.tr('remember_me'),
+                  //           style: TextStyle(color: color.onSurface),
+                  //         ),
+                  //       ],
+                  //     ),
+                  //
+                  //     TextButton(
+                  //       onPressed: () {},
+                  //       child: Text(
+                  //         context.tr('forgot_password'),
+                  //         style: TextStyle(color: color.primary),
+                  //       ),
+                  //     ),
+                  //   ],
+                  // ),
 
-                      TextButton(
-                        onPressed: () {},
-                        child: Text(
-                          context.tr('forgot_password'),
-                          style: TextStyle(color: color.primary),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 36),
 
                   Consumer<AuthProvider>(
                     builder: (context, provider, child) {
@@ -275,21 +275,21 @@ class _NovaLoginScreenState extends State<NovaLoginScreen> {
                   ),
 
                   const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        context.tr('dont_have_account'),
-                        style: TextStyle(
-                          color: color.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => context.go('/register'),
-                        child: Text(context.tr('sign_up')),
-                      ),
-                    ],
-                  ),
+                  // Row(
+                  //   mainAxisAlignment: MainAxisAlignment.center,
+                  //   children: [
+                  //     Text(
+                  //       context.tr('dont_have_account'),
+                  //       style: TextStyle(
+                  //         color: color.onSurface.withValues(alpha: 0.6),
+                  //       ),
+                  //     ),
+                  //     TextButton(
+                  //       onPressed: () => context.go('/register'),
+                  //       child: Text(context.tr('sign_up')),
+                  //     ),
+                  //   ],
+                  // ),
                 ],
               ),
             ),

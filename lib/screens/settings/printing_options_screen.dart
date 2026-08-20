@@ -1,9 +1,11 @@
 import 'package:mpos/utils/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:mpos/provider/printing_provider.dart';
+import 'package:mpos/utils/receipt_utils.dart';
+import 'package:mpos/dio_client/dio_client.dart';
+import 'package:mpos/resources/api_routes.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 
 class PrintingOptionsScreen extends StatefulWidget {
   const PrintingOptionsScreen({super.key});
@@ -14,13 +16,120 @@ class PrintingOptionsScreen extends StatefulWidget {
 
 class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
   PrinterRole _activeRole = PrinterRole.receipt;
+  final _dio = DioClient().dio;
+  
+  final _storeNameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _footerController = TextEditingController();
+  
+  Map<String, dynamic>? _profile;
+  bool _isLoadingProfile = true;
+  bool _isSavingProfile = false;
 
   @override
   void initState() {
     super.initState();
+    _loadProfile();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkPermissions();
     });
+  }
+
+  @override
+  void dispose() {
+    _storeNameController.dispose();
+    _phoneController.dispose();
+    _footerController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final response = await _dio.get(ApiRoutes.storeProfile);
+      final data = response.data;
+      final profile = (data is Map && data['store_profile'] != null) 
+          ? data['store_profile'] 
+          : ((data is Map && data['data'] != null) ? data['data'] : data);
+
+      if (profile is Map) {
+        setState(() {
+          _profile = Map<String, dynamic>.from(profile);
+          _storeNameController.text = _profile?['store_name']?.toString() ?? '';
+          _phoneController.text = _profile?['phone']?.toString() ?? '';
+          _footerController.text = _profile?['receipt_footer']?.toString() ?? '';
+          _isLoadingProfile = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading profile: $e');
+      setState(() => _isLoadingProfile = false);
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    setState(() => _isSavingProfile = true);
+    try {
+      final payload = {
+        ...(_profile ?? {}),
+        'store_name': _storeNameController.text.trim(),
+        'phone': _phoneController.text.trim(),
+        'receipt_footer': _footerController.text.trim(),
+      };
+      await _dio.put(ApiRoutes.storeProfile, data: payload);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Receipt settings saved')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving settings: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingProfile = false);
+    }
+  }
+
+  void _showPreview() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Receipt Preview'),
+        content: SingleChildScrollView(
+          child: ReceiptPreviewWidget(
+            data: ReceiptData(
+              saleNo: 'POS-SAMPLE-001',
+              date: DateTime.now().toString().substring(0, 16),
+              customerName: 'Sample Customer',
+              paymentMethod: 'Cash',
+              items: [
+                {'name': 'Sample Product 1', 'qty': 2, 'price': 1500, 'unit_name': 'pcs'},
+                {'name': 'Sample Product 2', 'qty': 1, 'price': 3200, 'unit_name': 'pcs'},
+              ],
+              subtotal: 6200,
+              discount: 200,
+              tax: 300,
+              taxRate: 5,
+              total: 6300,
+              paid: 7000,
+              change: 700,
+              creditAmount: 0,
+              storeName: _storeNameController.text,
+              storeAddress: _profile?['address_line1'] ?? '',
+              storePhone: _phoneController.text,
+              receiptFooter: _footerController.text,
+              currencyCode: _profile?['currency_code'] ?? 'LKR',
+              logoBytes: context.read<PrintingProvider>().logoBytes,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        ],
+      ),
+    );
   }
 
   Future<void> _checkPermissions() async {
@@ -75,6 +184,8 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
             const SizedBox(height: 12),
             if (_activeRole == PrinterRole.receipt) ...[
               _buildAutoPrintSection(printingProvider, theme),
+              const SizedBox(height: 12),
+              _buildReceiptCustomizationSection(theme),
               const SizedBox(height: 20),
             ],
             _buildDeviceListSection(printingProvider, theme),
@@ -91,7 +202,7 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isConnected ? Colors.green.withOpacity(0.1) : theme.colorScheme.error.withOpacity(0.1),
+        color: isConnected ? Colors.green.withValues(alpha: 0.1) : theme.colorScheme.error.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: isConnected ? Colors.green : theme.colorScheme.error),
       ),
@@ -219,6 +330,66 @@ class _PrintingOptionsScreenState extends State<PrintingOptionsScreen> {
         subtitle: Text(context.tr('auto_print_subtitle')),
         value: provider.autoPrint,
         onChanged: (value) => provider.setAutoPrint(value),
+      ),
+    );
+  }
+
+  Widget _buildReceiptCustomizationSection(ThemeData theme) {
+    if (_isLoadingProfile) {
+      return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()));
+    }
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.dividerColor),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Receipt Customization', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                TextButton.icon(
+                  onPressed: _showPreview,
+                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                  label: const Text('Preview'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _storeNameController,
+              decoration: const InputDecoration(labelText: 'Store Name', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _phoneController,
+              decoration: const InputDecoration(labelText: 'Phone', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _footerController,
+              maxLines: 2,
+              decoration: const InputDecoration(labelText: 'Receipt Footer', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isSavingProfile ? null : _saveProfile,
+                icon: _isSavingProfile 
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.save_outlined),
+                label: const Text('Save Customization'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
