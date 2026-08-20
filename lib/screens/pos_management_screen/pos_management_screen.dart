@@ -24,6 +24,10 @@ import 'widgets/management_option_card.dart';
 import 'widgets/management_tabs.dart';
 import 'package:mpos/utils/custom_snackbar.dart';
 import 'package:mpos/screens/pos_screen/widgets/barcode_scanner_view.dart';
+import 'package:mpos/utils/receipt_utils.dart';
+import 'package:mpos/database/database_helper.dart';
+import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:mpos/utils/barcode_utils.dart';
 
 const _statusOptions = [
   _FieldOption('true', 'Active'),
@@ -1214,45 +1218,181 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
       _showSnack('Sale id missing.', isError: true);
       return;
     }
-    final controller = TextEditingController(
-      text: record['status']?.toString() ?? 'completed',
-    );
-    final status = await showDialog<String>(
+    
+    final TextEditingController notesController = TextEditingController(text: record['notes']?.toString() ?? '');
+    String selectedStatus = record['status']?.toString() ?? 'completed';
+    
+    final saleStatusOptions = [
+      _FieldOption('held', 'Held'),
+      _FieldOption('completed', 'Completed'),
+      _FieldOption('cancelled', 'Cancelled'),
+      _FieldOption('refunded', 'Refunded'),
+    ];
+
+    await showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (context) => AlertDialog(
         title: const Text('Update sale status'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'Status'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: saleStatusOptions.any((o) => o.value == selectedStatus) ? selectedStatus : 'completed',
+              items: saleStatusOptions.map((s) => DropdownMenuItem(value: s.value, child: Text(s.label))).toList(),
+              onChanged: (v) => selectedStatus = v ?? selectedStatus,
+              decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: notesController,
+              decoration: const InputDecoration(labelText: 'Notes', border: OutlineInputBorder()),
+              maxLines: 2,
+            ),
+          ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            onPressed: () async {
+              try {
+                await _dio.put('${ApiRoutes.posSales}/$id', data: {'status': selectedStatus, 'notes': notesController.text.trim()});
+                if (context.mounted) Navigator.pop(context);
+                _loadActiveTab();
+                _showSnack('Sale updated successfully');
+              } catch (e) {
+                _showSnack(_messageFor(e), isError: true);
+              }
+            },
             child: const Text('Update'),
           ),
         ],
       ),
     );
-    controller.dispose();
-    if (status == null || status.isEmpty) return;
+  }
 
-    try {
-      setState(() => _isLoading = true);
-      await _dio.put(
-        '${ApiRoutes.posSales}/$id/status',
-        data: {'status': status},
-      );
-      _showSnack('Sale status updated');
-      await _loadActiveTab();
-    } catch (error) {
-      _showSnack(_messageFor(error), isError: true);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+  Future<void> _showReceiptPreview(Map<String, dynamic> record) async {
+    final profile = await DatabaseHelper().getStoreProfile();
+    if (profile.isEmpty) {
+      _showSnack('Store profile not found. Please set up store in settings.', isError: true);
+      return;
     }
+
+    final data = ReceiptData(
+      saleNo: record['sale_no']?.toString() ?? 'POS-SALE',
+      date: _formatDateTime(record['created_at']),
+      customerName: _display(record['customer']),
+      paymentMethod: record['payment_method']?.toString() ?? 'Cash',
+      items: ((record['items'] as List?) ?? []).map((item) {
+        final product = item['product'] is Map ? item['product'] : {};
+        return {
+          'name': product['name'] ?? 'Product',
+          'qty': _toDouble(item['qty'] ?? item['quantity']),
+          'price': _toDouble(item['unit_price']),
+          'unit_name': product['unit']?['short_name'] ?? 'pcs',
+          'is_weighted': product['is_weighted'] == true,
+        };
+      }).toList(),
+      subtotal: _toDouble(record['subtotal']),
+      discount: _toDouble(record['discount_total']),
+      tax: _toDouble(record['tax_total']),
+      taxRate: _toDouble(record['tax_rate']),
+      total: _toDouble(record['grand_total']),
+      paid: _toDouble(record['paid_amount']),
+      change: _toDouble(record['balance_amount']),
+      creditAmount: _toDouble(record['credit_amount']),
+      storeName: profile['store_name']?.toString() ?? 'NOVA POS',
+      storeAddress: [profile['address_line1'], profile['city']].where((e) => e != null && e.toString().isNotEmpty).join(', '),
+      storePhone: profile['phone']?.toString() ?? '',
+      receiptFooter: profile['receipt_footer']?.toString() ?? 'Thank you!',
+      currencyCode: profile['currency_code']?.toString() ?? 'LKR',
+      logoBytes: context.read<PrintingProvider>().logoBytes,
+    );
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, controller) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Receipt Preview', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                ],
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: controller,
+                  child: Center(child: ReceiptPreviewWidget(data: data)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final pdf = ReceiptUtils.generatePdfReceipt(data: data, widthMm: 80, context: context);
+                        await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+                      },
+                      icon: const Icon(Icons.picture_as_pdf_outlined),
+                      label: const Text('PDF'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final printingProvider = context.read<PrintingProvider>();
+                        if (!printingProvider.isConnected(PrinterRole.receipt)) {
+                          _showSnack('Receipt printer not connected', isError: true);
+                          return;
+                        }
+                        final profile = await CapabilityProfile.load();
+                        final bytes = await ReceiptUtils.generateThermalBytes(
+                          data: data,
+                          paperSize: printingProvider.paperSize(PrinterRole.receipt),
+                          profile: profile,
+                          context: context,
+                        );
+                        await printingProvider.sendReceiptBytes(bytes);
+                      },
+                      icon: const Icon(Icons.print_outlined),
+                      label: const Text('Thermal'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final pdf = ReceiptUtils.generatePdfReceipt(data: data, widthMm: 80, context: context);
+                    await Printing.sharePdf(bytes: await pdf.save(), filename: 'receipt-${data.saleNo}.pdf');
+                  },
+                  icon: const Icon(Icons.share_outlined),
+                  label: const Text('Share Receipt'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _showSnack(String message, {bool isError = false}) {
@@ -1597,13 +1737,13 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           builder: (_, controller) {
             final isProduct = resource.tab == 'Products' || resource.tab == 'Stocks' || record.containsKey('selling_price');
             final isSale = resource.tab == 'POS sales' || record.containsKey('sale_no');
-            
+
             return ListView(
               controller: controller, padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
               children: [
                 Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
                 const SizedBox(height: 16),
-                
+
                 if (isSale) ..._buildSaleDetails(record, resource)
                 else if (isProduct) ..._buildProductDetails(record, resource)
                 else ..._buildGenericDetails(record, resource),
@@ -1622,13 +1762,13 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     final balance = _toDouble(record['balance_amount']);
     final status = record['status']?.toString() ?? 'completed';
     final items = (record['items'] as List?) ?? [];
-    
+
     return [
       _DetailHeader(
         title: saleNo,
         subtitle: _formatDateTime(record['created_at']),
         status: status,
-        trailing: Icon(Icons.receipt_long_outlined, size: 32, color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
+        trailing: Icon(Icons.receipt_long_outlined, size: 32, color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5)),
       ),
       const SizedBox(height: 24),
       Row(
@@ -1643,7 +1783,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         _MetricBox(label: 'Balance Due', value: 'LKR ${balance.toStringAsFixed(0)}', icon: Icons.info_outline, color: Colors.orange),
       ],
       const SizedBox(height: 24),
-      
+
       _DetailSection(
         title: 'Order Items',
         icon: Icons.list_alt_outlined,
@@ -1653,7 +1793,8 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
           final qty = _toDouble(item['qty'] ?? item['quantity']);
           final price = _toDouble(item['unit_price']);
           final sub = _toDouble(item['line_total']);
-          
+          final code = prod['barcode']?.toString() ?? prod['product_code']?.toString() ?? '';
+
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Row(
@@ -1667,6 +1808,20 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
+                if (code.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.print_outlined, size: 20, color: Colors.blue),
+                    tooltip: 'Print Label',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => BarcodeUtils.printLabel(
+                      name: name,
+                      code: code,
+                      price: price.toStringAsFixed(0),
+                    ),
+                  ),
+                const SizedBox(width: 12),
                 Text('LKR ${sub.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
               ],
             ),
@@ -1691,7 +1846,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     final pricingKeys = ['selling_price', 'cost_price', 'wholesale_price', 'tax_rate', 'discount_rate'];
     final inventoryKeys = ['stock_quantity', 'minimum_stock', 'weight', 'is_weighted', 'unit', 'unit_id'];
     final generalKeys = ['category', 'category_id', 'brand', 'brand_id', 'barcode', 'product_code', 'sku'];
-    
+
     final name = record['name']?.toString() ?? 'Unnamed Product';
     final sku = (record['product_code'] ?? record['sku'] ?? record['barcode'] ?? '-').toString();
     final price = _toDouble(record['selling_price'] ?? record['price']);
@@ -1736,7 +1891,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     final contactKeys = ['phone', 'email', 'address', 'website', 'mobile'];
     final metaKeys = ['created_at', 'updated_at', 'id', '_id', 'created_by', 'updated_by'];
     final infoKeys = ['name', 'title', 'status', 'role_name', 'description', 'notes', 'remarks'];
-    
+
     final children = record.entries.where((e) => !contactKeys.contains(e.key) && !metaKeys.contains(e.key) && !infoKeys.contains(e.key)).map((e) => _DetailRow(label: _label(e.key), value: _display(e.value))).toList();
     final contacts = record.entries.where((e) => contactKeys.contains(e.key)).map((e) => _DetailRow(label: _label(e.key), value: _display(e.value))).toList();
     final meta = record.entries.where((e) => metaKeys.contains(e.key)).map((e) => _DetailRow(label: _label(e.key), value: _display(e.value))).toList();
@@ -2120,7 +2275,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
 
     final isProductTab = resource.tab == 'Products' || resource.tab == 'Stocks';
     final isSalesTab = resource.tab == 'POS sales';
-    
+
     final query = _productSearch.trim().toLowerCase();
     final filtered = query.isEmpty || (!isProductTab && !isSalesTab)
         ? _records
@@ -2188,6 +2343,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
              record: record,
              onView: () => _showDetails(resource, record),
              onUpdateStatus: resource.canUpdateStatus ? () => _updateSaleStatus(record) : null,
+             onPrintBill: () => _showReceiptPreview(record),
            );
         }
         return _ResourceActionCard(
@@ -2839,9 +2995,9 @@ class _ReportSection extends StatelessWidget {
         Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(_prettyLabel(label).toUpperCase(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: theme.colorScheme.primary))),
         ClipRRect(borderRadius: BorderRadius.circular(8), child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: DataTable(
           showCheckboxColumn: false,
-          headingRowColor: WidgetStateProperty.all(isDark ? theme.colorScheme.surfaceContainerHighest : const Color(0xFF102516)), 
-          headingTextStyle: TextStyle(color: isDark ? theme.colorScheme.onSurface : Colors.white, fontSize: 11, fontWeight: FontWeight.w900), 
-          columns: keys.map<DataColumn>((k) => DataColumn(label: Text(_prettyLabel(k.toString()).toUpperCase()))).toList(), 
+          headingRowColor: WidgetStateProperty.all(isDark ? theme.colorScheme.surfaceContainerHighest : const Color(0xFF102516)),
+          headingTextStyle: TextStyle(color: isDark ? theme.colorScheme.onSurface : Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
+          columns: keys.map<DataColumn>((k) => DataColumn(label: Text(_prettyLabel(k.toString()).toUpperCase()))).toList(),
           rows: rows.map<DataRow>((row) => DataRow(
             onSelectChanged: onViewRow != null ? (_) => onViewRow!(row) : null,
             cells: keys.map<DataCell>((k) => DataCell(Text(_simpleDisplay(row[k])))).toList(),
@@ -2914,8 +3070,9 @@ class _SaleActionCard extends StatelessWidget {
   final Map<String, dynamic> record;
   final VoidCallback onView;
   final VoidCallback? onUpdateStatus;
+  final VoidCallback? onPrintBill;
 
-  const _SaleActionCard({required this.record, required this.onView, this.onUpdateStatus});
+  const _SaleActionCard({required this.record, required this.onView, this.onUpdateStatus, this.onPrintBill});
 
   @override
   Widget build(BuildContext context) {
@@ -2965,6 +3122,10 @@ class _SaleActionCard extends StatelessWidget {
           Row(
             children: [
               Expanded(child: OutlinedButton.icon(onPressed: onView, icon: const Icon(Icons.visibility_outlined, size: 16), label: const Text('Details'), style: _rowButtonStyle(context))),
+              if (onPrintBill != null) ...[
+                const SizedBox(width: 8),
+                Expanded(child: ElevatedButton.icon(onPressed: onPrintBill, icon: const Icon(Icons.print_outlined, size: 16), label: const Text('Print Bill'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12)))),
+              ],
               if (onUpdateStatus != null) ...[
                 const SizedBox(width: 8),
                 Expanded(child: OutlinedButton.icon(onPressed: onUpdateStatus, icon: const Icon(Icons.flag_outlined, size: 16), label: const Text('Status'), style: _rowButtonStyle(context))),
@@ -2988,9 +3149,9 @@ class _SaleActionCard extends StatelessWidget {
 
 class _DetailRow extends StatelessWidget {
   final String label; final String value; const _DetailRow({required this.label, required this.value});
-  @override Widget build(BuildContext context) { 
+  @override Widget build(BuildContext context) {
     if (value == '-' || value == 'null') return const SizedBox.shrink();
-    return Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [ Expanded(child: Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5), fontSize: 13, fontWeight: FontWeight.w500))), const SizedBox(width: 12), Expanded(child: Text(value, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))) ])); 
+    return Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [ Expanded(child: Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5), fontSize: 13, fontWeight: FontWeight.w500))), const SizedBox(width: 12), Expanded(child: Text(value, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))) ]));
   }
 }
 

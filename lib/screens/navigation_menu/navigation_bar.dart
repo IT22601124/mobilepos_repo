@@ -259,12 +259,12 @@ class SettingsScreen extends StatelessWidget {
                 },
               ),
             ),
-            _SettingsTile(
-              icon: Icons.receipt_long,
-              title: context.tr('receipt_footer'),
-              subtitle: 'Thank you for shopping with NOVA POS',
-              trailing: const Icon(Icons.chevron_right),
-            ),
+            // _SettingsTile(
+            //   icon: Icons.receipt_long,
+            //   title: context.tr('receipt_footer'),
+            //   subtitle: 'Thank you for shopping with NOVA POS',
+            //   trailing: const Icon(Icons.chevron_right),
+            // ),
             _SettingsTile(
               icon: Icons.print_outlined,
               title: context.tr('printing_options'),
@@ -272,18 +272,18 @@ class SettingsScreen extends StatelessWidget {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/printing-options'),
             ),
-            _SettingsTile(
-              icon: Icons.payments_outlined,
-              title: context.tr('payment_methods'),
-              subtitle: 'Cash, card, credit and wallet enabled',
-              trailing: const Icon(Icons.chevron_right),
-            ),
-            _SettingsTile(
-              icon: Icons.security_outlined,
-              title: context.tr('security'),
-              subtitle: context.tr('security_subtitle'),
-              trailing: const Icon(Icons.chevron_right),
-            ),
+            // _SettingsTile(
+            //   icon: Icons.payments_outlined,
+            //   title: context.tr('payment_methods'),
+            //   subtitle: 'Cash, card, credit and wallet enabled',
+            //   trailing: const Icon(Icons.chevron_right),
+            // ),
+            // _SettingsTile(
+            //   icon: Icons.security_outlined,
+            //   title: context.tr('security'),
+            //   subtitle: context.tr('security_subtitle'),
+            //   trailing: const Icon(Icons.chevron_right),
+            // ),
             _SettingsTile(
               icon: Icons.storefront,
               title: context.tr('store_management'),

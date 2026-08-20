@@ -103,10 +103,12 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
       return;
     }
 
+    /* Removing stock check to allow negative stock sales
     if (currentQty >= stock) {
       CustomSnackBar.warning(context, 'Only ${stock.toInt()} items available in stock.');
       return;
     }
+    */
 
     setState(() {
       if (index >= 0) {
@@ -122,6 +124,7 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
     final item = cart[index];
     final isWeighted = item['is_weighted'] == true;
 
+    /* Removing stock check to allow negative stock sales
     if (qty > 0) {
       final stock = _toDouble(item['stock']);
       if (qty > stock) {
@@ -129,6 +132,7 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
         return;
       }
     }
+    */
 
     if (isWeighted && qty > 0) {
       // For weighted items, clicking +/- should ideally show the dialog again
@@ -625,28 +629,28 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
                       ),
                     ),
                   const SizedBox(height: 24),
-                  _SectionHeader(
-                    title: context.tr('products'),
-                    subtitle: '${filteredProducts.length} items',
-                  ),
-                  const SizedBox(height: 10),
-                  ...filteredProducts.map(
-                    (product) {
-                      final cartItem = cart.firstWhere(
-                        (item) => item['sku'] == product['sku'],
-                        orElse: () => {},
-                      );
-                      final cartQty = (cartItem['qty'] as num?)?.toDouble() ?? 0.0;
-
-                      return ProductCard(
-                        product: product,
-                        cartQty: cartQty,
-                        onTap: () => addToCart(product),
-                      );
-                    },
-                  ),
-                  if (filteredProducts.isEmpty && !isLoading) const _NoProductsFound(),
-                  const SizedBox(height: 20),
+                  // _SectionHeader(
+                  //   title: context.tr('products'),
+                  //   subtitle: '${filteredProducts.length} items',
+                  // ),
+                  // const SizedBox(height: 10),
+                  // ...filteredProducts.map(
+                  //   (product) {
+                  //     final cartItem = cart.firstWhere(
+                  //       (item) => item['sku'] == product['sku'],
+                  //       orElse: () => {},
+                  //     );
+                  //     final cartQty = (cartItem['qty'] as num?)?.toDouble() ?? 0.0;
+                  //
+                  //     return ProductCard(
+                  //       product: product,
+                  //       cartQty: cartQty,
+                  //       onTap: () => addToCart(product),
+                  //     );
+                  //   },
+                  // ),
+                  // if (filteredProducts.isEmpty && !isLoading) const _NoProductsFound(),
+                  // const SizedBox(height: 20),
                 ],
               ),
             ),
