@@ -93,23 +93,24 @@ class _PaymentPanelState extends State<PaymentPanel> {
                     children: [
                       Row(
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
                             children: [
                               Text(
                                 context.tr('total_payable'),
                                 style: TextStyle(
                                   color: colors.onSurface.withValues(alpha: 0.5),
-                                  fontSize: 10,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w800,
-                                  letterSpacing: 1.2,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(width: 30),
                               Text(
                                 money(widget.total),
                                 style: const TextStyle(
-                                  fontSize: 22,
+                                  fontSize: 18,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: -0.5,
                                 ),
@@ -131,6 +132,28 @@ class _PaymentPanelState extends State<PaymentPanel> {
                         _SummaryRow(label: context.tr('subtotal'), value: money(widget.subtotal)),
                         _SummaryRow(label: context.tr('discount'), value: money(widget.discount)),
                         _SummaryRow(label: '${context.tr('tax')} (8%)', value: money(widget.tax)),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: _CompactField(
+                                label: context.tr('discount'),
+                                icon: Icons.sell_outlined,
+                                onChanged: (v) => widget.onDiscountChanged(double.tryParse(v) ?? 0),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 4,
+                              child: _CompactDropdown(
+                                value: widget.paymentMethod,
+                                items: const ['Cash', 'Card', 'Credit', 'Wallet'],
+                                onChanged: (v) => v != null ? widget.onPaymentChanged(v) : null,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ],
                   ),
@@ -143,28 +166,6 @@ class _PaymentPanelState extends State<PaymentPanel> {
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: _CompactField(
-                          label: context.tr('discount'),
-                          icon: Icons.sell_outlined,
-                          onChanged: (v) => widget.onDiscountChanged(double.tryParse(v) ?? 0),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 4,
-                        child: _CompactDropdown(
-                          value: widget.paymentMethod,
-                          items: const ['Cash', 'Card', 'Credit', 'Wallet'],
-                          onChanged: (v) => v != null ? widget.onPaymentChanged(v) : null,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(

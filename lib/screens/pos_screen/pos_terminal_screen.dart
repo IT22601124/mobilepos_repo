@@ -6,7 +6,9 @@ import 'package:mpos/dio_client/dio_client.dart';
 import 'package:mpos/provider/connectivity_provider.dart';
 import 'package:mpos/provider/sync_provider.dart';
 import 'package:mpos/resources/api_routes.dart';
+import 'package:mpos/provider/app_settings_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_beep/flutter_beep.dart';
 import 'package:mpos/screens/pos_screen/widgets/barcode_scanner_view.dart';
 import 'package:mpos/screens/pos_screen/widgets/card_tems.dart';
 import 'package:mpos/screens/pos_screen/widgets/category_tabs.dart';
@@ -576,6 +578,9 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
               focusNode: _searchFocusNode,
               suggestions: products,
               onSuggestionSelected: (product) {
+                if (context.read<AppSettingsProvider>().isSoundEnabled) {
+                  FlutterBeep.beep();
+                }
                 addToCart(product);
                 _searchController.clear();
                 setState(() {

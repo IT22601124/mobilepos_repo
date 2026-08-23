@@ -461,74 +461,6 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         sample: [],
       ),
       _ResourceConfig(
-        tab: 'Branches',
-        title: 'Branches',
-        subtitle: 'Branch name, code, contact details and status.',
-        endpoint: ApiRoutes.branches,
-        icon: Icons.store_mall_directory_outlined,
-        color: _green,
-        fields: const [
-          _FieldConfig('name', 'Branch name', required: true),
-          _FieldConfig('code', 'Branch code'),
-          _FieldConfig('phone', 'Phone', keyboardType: TextInputType.phone),
-          _FieldConfig(
-            'email',
-            'Email',
-            keyboardType: TextInputType.emailAddress,
-          ),
-          _FieldConfig('address', 'Address'),
-          _FieldConfig('status', 'Status', options: _statusOptions),
-        ],
-        sample: [],
-      ),
-      _ResourceConfig(
-        tab: 'Roles',
-        title: 'Roles',
-        subtitle: 'Backend roles used by cashiers, admins and managers.',
-        endpoint: ApiRoutes.roles,
-        icon: Icons.admin_panel_settings_outlined,
-        color: _pink,
-        fields: const [
-          _FieldConfig('name', 'Role name', required: true),
-          _FieldConfig('role_name', 'Role display name'),
-          _FieldConfig('description', 'Description'),
-          _FieldConfig('status', 'Status', options: _statusOptions),
-        ],
-        sample: [],
-      ),
-      _ResourceConfig(
-        tab: 'Users',
-        title: 'Backend users',
-        subtitle: 'View authenticated backend users and cashier accounts.',
-        endpoint: ApiRoutes.authUsers,
-        icon: Icons.verified_user_outlined,
-        color: _blue,
-        fields: const [
-          _FieldConfig('name', 'Full name', required: true),
-          _FieldConfig('phone', 'Phone', keyboardType: TextInputType.phone, required: true),
-          _FieldConfig('email', 'Email', keyboardType: TextInputType.emailAddress, required: true),
-          _FieldConfig('password', 'Password'),
-          _FieldConfig(
-            'role_id',
-            'Role',
-            keyboardType: TextInputType.number,
-            required: true,
-            lookupEndpoint: ApiRoutes.roles,
-          ),
-          _FieldConfig(
-            'branch_id',
-            'Branch',
-            keyboardType: TextInputType.number,
-            lookupEndpoint: ApiRoutes.branches,
-          ),
-          _FieldConfig('status', 'Status', options: _statusOptions),
-        ],
-        canCreate: isSuperAdmin,
-        canEdit: isSuperAdmin,
-        canDelete: isSuperAdmin,
-        sample: [],
-      ),
-      _ResourceConfig(
         tab: 'POS sales',
         title: 'POS sales',
         subtitle: 'Create sales and update order/payment status.',
@@ -599,6 +531,76 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
         canUpdateStatus: true,
         sample: [],
       ),
+      if (isSuperAdmin) ...[
+        _ResourceConfig(
+          tab: 'Branches',
+          title: 'Branches',
+          subtitle: 'Branch name, code, contact details and status.',
+          endpoint: ApiRoutes.branches,
+          icon: Icons.store_mall_directory_outlined,
+          color: _green,
+          fields: const [
+            _FieldConfig('name', 'Branch name', required: true),
+            _FieldConfig('code', 'Branch code'),
+            _FieldConfig('phone', 'Phone', keyboardType: TextInputType.phone),
+            _FieldConfig(
+              'email',
+              'Email',
+              keyboardType: TextInputType.emailAddress,
+            ),
+            _FieldConfig('address', 'Address'),
+            _FieldConfig('status', 'Status', options: _statusOptions),
+          ],
+          sample: [],
+        ),
+        _ResourceConfig(
+          tab: 'Roles',
+          title: 'Roles',
+          subtitle: 'Backend roles used by cashiers, admins and managers.',
+          endpoint: ApiRoutes.roles,
+          icon: Icons.admin_panel_settings_outlined,
+          color: _pink,
+          fields: const [
+            _FieldConfig('name', 'Role name', required: true),
+            _FieldConfig('role_name', 'Role display name'),
+            _FieldConfig('description', 'Description'),
+            _FieldConfig('status', 'Status', options: _statusOptions),
+          ],
+          sample: [],
+        ),
+        _ResourceConfig(
+          tab: 'Users',
+          title: 'Backend users',
+          subtitle: 'View authenticated backend users and cashier accounts.',
+          endpoint: ApiRoutes.authUsers,
+          icon: Icons.verified_user_outlined,
+          color: _blue,
+          fields: const [
+            _FieldConfig('name', 'Full name', required: true),
+            _FieldConfig('phone', 'Phone', keyboardType: TextInputType.phone, required: true),
+            _FieldConfig('email', 'Email', keyboardType: TextInputType.emailAddress, required: true),
+            _FieldConfig('password', 'Password'),
+            _FieldConfig(
+              'role_id',
+              'Role',
+              keyboardType: TextInputType.number,
+              required: true,
+              lookupEndpoint: ApiRoutes.roles,
+            ),
+            _FieldConfig(
+              'branch_id',
+              'Branch',
+              keyboardType: TextInputType.number,
+              lookupEndpoint: ApiRoutes.branches,
+            ),
+            _FieldConfig('status', 'Status', options: _statusOptions),
+          ],
+          canCreate: isSuperAdmin,
+          canEdit: isSuperAdmin,
+          canDelete: isSuperAdmin,
+          sample: [],
+        ),
+      ],
       _ResourceConfig.report(),
       //_ResourceConfig.settings(),
     ];
@@ -1027,6 +1029,17 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     );
   }
 
+  Map<String, dynamic>? _extractSingleRecord(dynamic payload) {
+    if (payload is Map<String, dynamic>) {
+      if (payload.containsKey('id') || payload.containsKey('ID')) return payload;
+      for (final key in ['data', 'record', 'item', 'category', 'brand', 'unit', 'product']) {
+        final val = payload[key];
+        if (val is Map<String, dynamic>) return val;
+      }
+    }
+    return null;
+  }
+
   List<Map<String, dynamic>> _extractRows(dynamic payload) {
     const rowKeys = [
       'data',
@@ -1134,7 +1147,7 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     return null;
   }
 
-  Future<void> _saveRecord(
+  Future<Map<String, dynamic>?> _saveRecord(
     _ResourceConfig resource,
     Map<String, dynamic>? existing,
     Map<String, dynamic> data,
@@ -1142,19 +1155,25 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     final id = existing == null ? null : _recordId(existing);
     try {
       setState(() => _isLoading = true);
+      Response response;
       if (existing == null) {
-        await _dio.post(resource.endpoint, data: data);
+        response = await _dio.post(resource.endpoint, data: data);
       } else {
-        await _dio.put('${resource.endpoint}/$id', data: data);
+        response = await _dio.put('${resource.endpoint}/$id', data: data);
       }
-      if (!mounted) return;
-      Navigator.pop(context);
+      if (!mounted) return null;
+      
+      final savedRecord = _extractSingleRecord(response.data);
+      Navigator.pop(context, savedRecord);
+      
       _showSnack(
         existing == null ? '${resource.tab} added' : '${resource.tab} updated',
       );
       await _loadActiveTab();
+      return savedRecord;
     } catch (error) {
       _showSnack(_messageFor(error), isError: true);
+      return null;
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -1963,13 +1982,13 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
     }
   }
 
-  Future<void> _showForm(_ResourceConfig resource, {Map<String, dynamic>? record}) async {
+  Future<Map<String, dynamic>?> _showForm(_ResourceConfig resource, {Map<String, dynamic>? record}) async {
     final lookupOptions = <String, List<_LookupOption>>{};
     for (final field in resource.fields) {
       final endpoint = field.lookupEndpoint;
       if (endpoint != null) lookupOptions[field.key] = await _lookupOptions(endpoint);
     }
-    if (!mounted) return;
+    if (!mounted) return null;
     final controllers = {
       for (final field in resource.fields) field.key: TextEditingController(text: _initialFieldText(field, record)),
     };
@@ -1983,91 +2002,129 @@ class _PosManagementScreenState extends State<PosManagementScreen> {
       );
     }
 
-    showModalBottomSheet(
+    return showModalBottomSheet<Map<String, dynamic>>(
       context: context, isScrollControlled: true, backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
       builder: (_) {
-        return SafeArea(
-          top: false,
-          child: Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-            child: SizedBox(
-              height: MediaQuery.of(context).size.height * 0.92,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 14, 8, 10),
-                    child: Row(
-                      children: [
-                        Container(
-                          height: 38, width: 38,
-                          decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(6)),
-                          child: Icon(resource.icon, color: resource.color, size: 21),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(record == null ? '${context.tr('add')} ${context.tr(resource.tab.toLowerCase().replaceAll(' ', '_'))}' : '${context.tr('update')} ${context.tr(resource.tab.toLowerCase().replaceAll(' ', '_'))}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-                              Text(context.tr('${resource.tab.toLowerCase().replaceAll(' ', '_')}_subtitle'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
-                            ],
-                          ),
-                        ),
-                        IconButton(tooltip: context.tr('close'), onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: ListView(
-                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-                      children: [
-                        if (resource.tab == 'Products') const _FormHintCard(message: 'Choose category, brand and unit by name. The app will send the correct IDs to the backend.'),
-                        ...resource.fields.map((field) {
-                          final fieldOptions = field.options.map((option) => _LookupOption(value: option.value, label: option.label)).toList();
-                          return _FormInput(
-                            fieldKey: field.key,
-                            label: field.label,
-                            controller: controllers[field.key]!,
-                            keyboardType: field.keyboardType,
-                            required: field.required,
-                            options: lookupOptions[field.key] ?? fieldOptions,
-                            onPrint: (resource.tab == 'Products' && field.key == 'barcode') ? handlePrintLabel : null,
-                          );
-                        }),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
-                    decoration: BoxDecoration(color: Theme.of(context).cardColor),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          final data = <String, dynamic>{};
-                          for (final field in resource.fields) {
-                            final value = controllers[field.key]!.text.trim();
-                            if (field.required && value.isEmpty) { _showSnack('${context.tr(field.key.toLowerCase())} ${context.tr('is_required_lower')}', isError: true); return; }
-                            if (value.isNotEmpty) data[field.key] = _fieldValue(field, value);
-                          }
-                          _saveRecord(resource, record, data);
-                        },
-                        icon: const Icon(Icons.save_outlined), label: Text(record == null ? context.tr('save') : context.tr('update')),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                          padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> refreshLookup(String fieldKey, String endpoint) async {
+              _lookupCache.remove(endpoint);
+              final options = await _lookupOptions(endpoint);
+              setModalState(() {
+                lookupOptions[fieldKey] = options;
+              });
+            }
+
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.92,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 14, 8, 10),
+                        child: Row(
+                          children: [
+                            Container(
+                              height: 38, width: 38,
+                              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(6)),
+                              child: Icon(resource.icon, color: resource.color, size: 21),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(record == null ? '${context.tr('add')} ${context.tr(resource.tab.toLowerCase().replaceAll(' ', '_'))}' : '${context.tr('update')} ${context.tr(resource.tab.toLowerCase().replaceAll(' ', '_'))}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+                                  Text(context.tr('${resource.tab.toLowerCase().replaceAll(' ', '_')}_subtitle'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                            IconButton(tooltip: context.tr('close'), onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                          ],
                         ),
                       ),
-                    ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                          children: [
+                            if (resource.tab == 'Products') const _FormHintCard(message: 'Choose category, brand and unit by name. The app will send the correct IDs to the backend.'),
+                            ...resource.fields.map((field) {
+                              final fieldOptions = field.options.map((option) => _LookupOption(value: option.value, label: option.label)).toList();
+                              
+                              VoidCallback? onAdd;
+                              if (field.lookupEndpoint != null) {
+                                final relatedTab = field.key == 'category_id' ? 'Categories' : field.key == 'brand_id' ? 'Brands' : field.key == 'unit_id' ? 'Units' : null;
+                                if (relatedTab != null) {
+                                  onAdd = () async {
+                                    final relatedResource = _resources.firstWhere((r) => r.tab == relatedTab);
+                                    final newRecord = await _showForm(relatedResource);
+                                    if (newRecord != null) {
+                                      await refreshLookup(field.key, field.lookupEndpoint!);
+                                      final newId = _recordId(newRecord);
+                                      if (newId != null) {
+                                        setModalState(() {
+                                          controllers[field.key]!.text = newId;
+                                        });
+                                      }
+                                    }
+                                  };
+                                }
+                              }
+
+                              return _FormInput(
+                                fieldKey: field.key,
+                                label: field.label,
+                                controller: controllers[field.key]!,
+                                keyboardType: field.keyboardType,
+                                required: field.required,
+                                options: lookupOptions[field.key] ?? fieldOptions,
+                                onPrint: (resource.tab == 'Products' && field.key == 'barcode') ? handlePrintLabel : null,
+                                onAdd: onAdd,
+                                onGenerate: (resource.tab == 'Products' && field.key == 'product_code') ? () {
+                                  final code = 'PRD${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+                                  controllers[field.key]!.text = code;
+                                } : null,
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
+                        decoration: BoxDecoration(color: Theme.of(context).cardColor),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              final data = <String, dynamic>{};
+                              for (final field in resource.fields) {
+                                final value = controllers[field.key]!.text.trim();
+                                if (field.required && value.isEmpty) { _showSnack('${context.tr(field.key.toLowerCase())} ${context.tr('is_required_lower')}', isError: true); return; }
+                                if (value.isNotEmpty) data[field.key] = _fieldValue(field, value);
+                              }
+                              _saveRecord(resource, record, data);
+                            },
+                            icon: const Icon(Icons.save_outlined), label: Text(record == null ? context.tr('save') : context.tr('update')),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                              padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          }
         );
       },
     ).whenComplete(() {
@@ -3269,42 +3326,95 @@ class _MetricBox extends StatelessWidget {
 class _FormInput extends StatelessWidget {
   final String fieldKey; final String label; final TextEditingController controller; final TextInputType keyboardType; final bool required; final List<_LookupOption> options;
   final VoidCallback? onPrint;
+  final VoidCallback? onAdd;
+  final VoidCallback? onGenerate;
 
-  const _FormInput({required this.fieldKey, required this.label, required this.controller, required this.keyboardType, required this.required, required this.options, this.onPrint});
+  const _FormInput({required this.fieldKey, required this.label, required this.controller, required this.keyboardType, required this.required, required this.options, this.onPrint, this.onAdd, this.onGenerate});
   @override Widget build(BuildContext context) {
     final menuOptions = options.isNotEmpty ? options : const <_LookupOption>[];
     if (menuOptions.isNotEmpty) {
       final selected = menuOptions.any((option) => option.value == controller.text) ? controller.text : null;
-      return Padding(padding: const EdgeInsets.only(bottom: 10), child: DropdownButtonFormField<String>(initialValue: selected, isExpanded: true, decoration: InputDecoration(labelText: required ? '$label *' : label, border: OutlineInputBorder(borderRadius: BorderRadius.circular(6))), items: menuOptions.map((option) => DropdownMenuItem<String>(value: option.value, child: Text(option.label, overflow: TextOverflow.ellipsis))).toList(), onChanged: (value) { controller.text = value ?? ''; }));
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: selected, isExpanded: true,
+                decoration: InputDecoration(labelText: required ? '$label *' : label, border: OutlineInputBorder(borderRadius: BorderRadius.circular(6))),
+                items: menuOptions.map((option) => DropdownMenuItem<String>(value: option.value, child: Text(option.label, overflow: TextOverflow.ellipsis))).toList(),
+                onChanged: (value) { controller.text = value ?? ''; }
+              )
+            ),
+            if (onAdd != null) ...[
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 56,
+                child: IconButton.filledTonal(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add),
+                  tooltip: 'Add new',
+                  style: IconButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
     }
     return Padding(
         padding: const EdgeInsets.only(bottom: 10),
-        child: TextField(
-            controller: controller,
-            keyboardType: keyboardType,
-            decoration: InputDecoration(
-                labelText: required ? '$label *' : label,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (onPrint != null)
-                      IconButton(
-                          icon: const Icon(Icons.print_outlined),
-                          onPressed: onPrint,
-                          tooltip: 'Print barcode label'),
-                    if (fieldKey == 'barcode')
-                      IconButton(
-                          icon: const Icon(Icons.qr_code_scanner),
-                          onPressed: () async {
-                            final result = await Navigator.push<String>(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const BarcodeScannerView()));
-                            if (result != null) controller.text = result;
-                          }),
-                  ],
-                ))));
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextField(
+                  controller: controller,
+                  keyboardType: keyboardType,
+                  decoration: InputDecoration(
+                      labelText: required ? '$label *' : label,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (onPrint != null)
+                            IconButton(
+                                icon: const Icon(Icons.print_outlined),
+                                onPressed: onPrint,
+                                tooltip: 'Print barcode label'),
+                          if (fieldKey == 'barcode')
+                            IconButton(
+                                icon: const Icon(Icons.qr_code_scanner),
+                                onPressed: () async {
+                                  final result = await Navigator.push<String>(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) => const BarcodeScannerView()));
+                                  if (result != null) controller.text = result;
+                                }),
+                          if (onGenerate != null)
+                            IconButton(
+                                icon: const Icon(Icons.auto_fix_high),
+                                onPressed: onGenerate,
+                                tooltip: 'Generate code'),
+                        ],
+                      ))),
+            ),
+            if (onAdd != null) ...[
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 56,
+                child: IconButton.filledTonal(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add),
+                  tooltip: 'Add new',
+                  style: IconButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
+                ),
+              ),
+            ],
+          ],
+        ));
   }
 }
 

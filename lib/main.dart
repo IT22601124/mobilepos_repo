@@ -7,6 +7,7 @@ import 'package:mpos/provider/printing_provider.dart';
 import 'package:mpos/provider/splash_provider/splash_provider.dart';
 import 'package:mpos/provider/sync_provider.dart';
 import 'package:mpos/provider/theme_provider/theme_provider.dart';
+import 'package:mpos/provider/app_settings_provider.dart';
 import 'package:mpos/route_checker/router_chekcer.dart';
 import 'package:mpos/provider/language_provider.dart';
 import 'package:mpos/utils/app_localizations.dart';
@@ -53,6 +54,7 @@ Future<void> main() async{
         ChangeNotifierProvider(create: (_) => PrintingProvider()),
         ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
         ChangeNotifierProvider(create: (_) => SyncProvider()),
+        ChangeNotifierProvider(create: (_) => AppSettingsProvider()),
       ],
       child: const NovaPOSApp(),
     ),

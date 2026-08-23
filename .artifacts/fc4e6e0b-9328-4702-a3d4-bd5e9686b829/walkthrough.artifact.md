@@ -1,33 +1,24 @@
-# Walkthrough - Dual Printer Support (Receipt & Label)
+# Walkthrough - Role-Based Management Access
 
-I have implemented support for connecting two separate printers simultaneously: one for **Sales Receipts** and another for **Product Labels**.
+I have updated the management screen to restrict access to sensitive administrative sections based on the user's role.
 
-## New Features
+## Changes Made
 
-### 1. Dual Printer Roles
-The app now differentiates between a **Receipt Printer** and a **Label Printer**.
-- **Independent Configuration**: You can use different connection types (Bluetooth/USB) and different paper widths for each role.
-- **Persistent Memory**: The app remembers which printer is assigned to which job even after a restart.
+### 1. Restricted Sections for Cashiers
+The app now checks if the current user is a **Super Admin** before displaying certain configuration tabs. Users with the **Cashier** role (or any role other than Super Admin) will no longer see the following sections:
+- **Branches**: Prevents modification of store branch details.
+- **Roles**: Restricts access to role definitions and permissions.
+- **Users**: Protects backend user accounts and cashier credentials.
 
-### 2. Tabbed Printing Setup
-The **Printing Options** screen has been updated with a tab bar:
-- **Receipt Printer Tab**: Configure your main bill printer (typically 80mm).
-- **Label Printer Tab**: Configure your barcode/price tag printer (typically 58mm).
-- **Status Visibility**: Each tab shows the connection status specifically for that role.
+### 2. Implementation Details
+- Modified `_buildResources()` in [pos_management_screen.dart](file:///F:/mpos/lib/screens/pos_management_screen/pos_management_screen.dart).
+- Used the `isSuperAdmin` flag from the `AuthProvider` to conditionally include these administrative resources in the management tabs list.
+- Reordered the resources slightly to ensure administrative sections appear after the core operational sections (Products, Sales) for Super Admins.
 
-### 3. Automatic Intelligent Routing
-- **Sales Flow**: Receipts are automatically sent to the assigned **Receipt Printer**.
-- **Product Management**: Barcode labels are automatically sent to the assigned **Label Printer**.
-- **Smart Fallbacks**: If a label printer is not connected, the app will warn you specifically about the label printer without affecting receipt functionality.
-
-## How to Set Up
-1. Go to **Settings** > **Printing Options**.
-2. Tap the **Receipt Printer** tab, scan, and connect your bill printer.
-3. Tap the **Label Printer** tab, scan, and connect your label printer.
-4. (Optional) Run a **Test Print** in each tab to verify both are working.
+## Verification Results
 
 > [!TIP]
-> You can assign the same printer to both roles if you use a single machine for all tasks. The app will handle the switching logic automatically.
+> This change enhances security by ensuring that cashiers only interact with the parts of the system necessary for their daily tasks.
 
-> [!IMPORTANT]
-> If you previously had a printer connected, you will need to reconnect it in the new tabbed interface to assign it a role.
+- **Super Admin View**: All tabs (Products, Stocks, Sales, Branches, Roles, Users, Reports) remain visible.
+- **Cashier View**: Only operational tabs (Products, Stocks, Categories, Brands, Units, Suppliers, Product Suppliers, Stock Movements, Batches, Images, Taxes, Discounts, Variants, Customers, Credit Ledger, POS Sales, Reports) are visible.

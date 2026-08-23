@@ -4,6 +4,7 @@ import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platfor
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:mpos/dio_client/dio_client.dart';
 
 enum PrinterConnectionType { bluetooth, usb }
 enum PrinterRole { receipt, label }
@@ -116,7 +117,7 @@ class PrintingProvider with ChangeNotifier {
     if (url == null || url.isEmpty) return;
     if (_logoBytes != null) return;
     try {
-      final response = await Dio().get<List<int>>(
+      final response = await DioClient.getRawDio().get<List<int>>(
         url,
         options: Options(responseType: ResponseType.bytes),
       );

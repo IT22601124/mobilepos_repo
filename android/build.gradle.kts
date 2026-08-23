@@ -22,6 +22,28 @@ subprojects {
         project.layout.buildDirectory.value(newSubprojectBuildDir)
     }
 }
+
+subprojects {
+    afterEvaluate {
+        if (project.extensions.findByName("android") != null) {
+            val android = project.extensions.getByName("android")
+            try {
+                val getNamespace = android.javaClass.getMethod("getNamespace")
+                val setNamespace = android.javaClass.getMethod("setNamespace", String::class.java)
+
+                if (getNamespace.invoke(android) == null) {
+                    val groupId = project.group.toString()
+                    if (groupId.isNotEmpty()) {
+                        setNamespace.invoke(android, groupId)
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore if the method doesn't exist or reflection fails
+            }
+        }
+    }
+}
+
 subprojects {
     if (project.name != "app") {
         project.evaluationDependsOn(":app")

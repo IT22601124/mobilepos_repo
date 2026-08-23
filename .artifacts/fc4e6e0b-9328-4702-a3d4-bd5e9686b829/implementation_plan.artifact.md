@@ -1,44 +1,31 @@
-# Implementation Plan - Dual Printer Support (Receipt & Label)
+# Implementation Plan - Role-Based Visibility for Management Sections
 
-This plan refactors the printing system to allow connecting and remembering two separate printer configurations: one for receipts and one for product labels.
+This plan describes how to hide sensitive management sections (Roles, Users, and Branches) for users with the "Cashier" role.
 
 ## User Review Required
 
-> [!IMPORTANT]
-> This change will allow you to assign a specific printer to "Receipts" and another (or the same one) to "Labels". The app will remember both connections.
+> [!NOTE]
+> The app will now check the logged-in user's role before building the management tabs. Users who are not Super Admins (including Cashiers) will no longer see the Branches, Roles, and Users tabs.
 
 ## Proposed Changes
 
-#### [MODIFY] [printing_provider.dart](file:///F:/mpos/lib/provider/printing_provider.dart)
-- Add `PrinterRole` enum: `receipt`, `label`.
-- Refactor printer storage to support two roles:
-    - `_receiptPrinter`: The device assigned to receipts.
-    - `_labelPrinter`: The device assigned to labels.
-- Update `connect` and `disconnect` methods to accept a `PrinterRole`.
-- Add `isReceiptConnected` and `isLabelConnected` getters.
-- Persist both assignments in `SharedPreferences`.
-- Update `printBarcodeLabel` to use the label printer.
-- Add `printReceiptData` method to handle receipt printing centrally using the receipt printer.
+### [Component Name] POS Management Screen
 
-### [Component Name] Printing Options Screen
-
-#### [MODIFY] [printing_options_screen.dart](file:///F:/mpos/lib/screens/settings/printing_options_screen.dart)
-- Add a **Role Selector** (e.g., Toggle Buttons or Tabs) at the top of the screen: **[Receipt Printer]** | **[Label Printer]**.
-- Display the connection status and available devices for the *active* role.
-- Allow the user to connect a different device for each role.
-
-### [Component Name] POS Payment Success Screen
-
-#### [MODIFY] [pos_payment_success_screen.dart](file:///F:/mpos/lib/screens/pos_screen/pos_payment_success_screen.dart)
-- Update `printReceipt` to use the new `PrintingProvider.printReceiptData` method (or ensure it targets the receipt role).
+#### [MODIFY] [pos_management_screen.dart](file:///F:/mpos/lib/screens/pos_management_screen/pos_management_screen.dart)
+- Update `_buildResources()` to conditionally include sections based on `isSuperAdmin`.
+- Hide the following tabs if `isSuperAdmin` is false:
+    - **Branches**
+    - **Roles**
+    - **Users**
+- This ensures cashiers can focus on products, stocks, and sales without accessing administrative configuration.
 
 ## Verification Plan
 
 ### Manual Verification
-1.  Navigate to **Settings** > **Printing Options**.
-2.  Select **Receipt Printer** role and connect a device.
-3.  Select **Label Printer** role and connect a (possibly different) device.
-4.  Switch back and forth to verify the app remembers which device is assigned to which role.
-5.  Perform a sale and verify it prints on the **Receipt Printer**.
-6.  Navigate to a product and click **Print Label**: verify it prints on the **Label Printer**.
-7.  Restart the app and verify both printers are still assigned correctly.
+1.  Log in as a **Super Admin**.
+2.  Navigate to **Management**.
+3.  Verify that **Branches**, **Roles**, and **Users** tabs are visible.
+4.  Log out and log in as a **Cashier**.
+5.  Navigate to **Management**.
+6.  Verify that the **Branches**, **Roles**, and **Users** tabs are **hidden**.
+7.  Verify that other sections like **Products**, **Stocks**, and **POS Sales** are still accessible.

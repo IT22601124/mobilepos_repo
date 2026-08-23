@@ -27,16 +27,7 @@ class DioClient {
       ),
     );
 
-    dio.httpClientAdapter = IOHttpClientAdapter(
-      createHttpClient: () {
-        final client = HttpClient();
-        client.badCertificateCallback = (certificate, host, port) {
-          if (kReleaseMode) return false;
-          return true; // Allow all certificates in debug mode
-        };
-        return client;
-      },
-    );
+    _configureSslBypass(dio);
 
     dio.interceptors.add(
       InterceptorsWrapper(
@@ -61,5 +52,25 @@ class DioClient {
         error: true,
       ),
     );
+  }
+
+  static void _configureSslBypass(Dio dioInstance) {
+    dioInstance.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient();
+        client.badCertificateCallback = (certificate, host, port) {
+          if (ApiRoutes.allowBadCertificates) return true;
+          if (kReleaseMode) return false;
+          return true; // Fallback for debug mode
+        };
+        return client;
+      },
+    );
+  }
+
+  static Dio getRawDio() {
+    final dio = Dio();
+    _configureSslBypass(dio);
+    return dio;
   }
 }

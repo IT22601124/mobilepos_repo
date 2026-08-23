@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mpos/dio_client/dio_client.dart';
 import 'package:mpos/resources/api_routes.dart';
+import 'package:provider/provider.dart';
+import 'package:mpos/provider/auth_provider/auth_provider.dart';
 
 class DashBaordScrren extends StatefulWidget {
   const DashBaordScrren({super.key});
@@ -31,7 +33,15 @@ class _DashBaordScrrenState extends State<DashBaordScrren> {
     });
 
     try {
-      final response = await _dio.get(ApiRoutes.dashboard);
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final userId = auth.userId;
+      
+      final response = await _dio.get(
+        ApiRoutes.dashboard,
+        queryParameters: {
+          if (userId != null) 'cashier_id': userId,
+        },
+      );
       final payload = _asMap(response.data);
       if (mounted) {
         setState(() => _dashboard = _DashboardData.fromJson(payload));

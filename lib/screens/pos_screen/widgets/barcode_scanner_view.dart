@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:flutter_beep/flutter_beep.dart';
+import 'package:provider/provider.dart';
+import 'package:mpos/provider/app_settings_provider.dart';
 
 class BarcodeScannerView extends StatefulWidget {
   const BarcodeScannerView({super.key});
@@ -99,6 +102,9 @@ class _BarcodeScannerViewState extends State<BarcodeScannerView> {
               if (barcodes.isNotEmpty) {
                 final String? code = barcodes.first.rawValue;
                 if (code != null) {
+                  if (mounted && context.read<AppSettingsProvider>().isSoundEnabled) {
+                    FlutterBeep.beep();
+                  }
                   setState(() => _isScanned = true);
                   await _controller.stop();
                   if (mounted) {

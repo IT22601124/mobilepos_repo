@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mpos/provider/auth_provider/auth_provider.dart';
 import 'package:mpos/provider/theme_provider/theme_provider.dart';
+import 'package:mpos/provider/app_settings_provider.dart';
 import 'package:mpos/screens/overview/dashboard_screen.dart';
 import 'package:mpos/utils/app_back_scope.dart';
 import 'package:mpos/provider/language_provider.dart';
@@ -222,6 +223,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
     final languageProvider = context.watch<LanguageProvider>();
+    final settingsProvider = context.watch<AppSettingsProvider>();
     final locale = languageProvider.locale;
 
     return Scaffold(
@@ -237,6 +239,18 @@ class SettingsScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           children: [
             _AppearanceSettingsCard(themeProvider: themeProvider),
+            _SettingsTile(
+              icon: settingsProvider.isSoundEnabled
+                  ? Icons.volume_up_rounded
+                  : Icons.volume_off_rounded,
+              title: context.tr('sound'),
+              subtitle: context.tr('sound_subtitle'),
+              trailing: Switch(
+                value: settingsProvider.isSoundEnabled,
+                onChanged: (val) => settingsProvider.setSoundEnabled(val),
+                activeColor: Theme.of(context).colorScheme.primary,
+              ),
+            ),
             _SettingsTile(
               icon: Icons.language_outlined,
               title: context.tr('language'),
